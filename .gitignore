@@ -1,0 +1,44 @@
+# --- Node / Playwright (E2E) ---
+node_modules
+dist
+test-results
+test-results.json
+playwright-report
+playwright/.cache
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.venv-spike/
+.venv-modal/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Env / secrets ---
+.env
+.env.local
+.env.*.local
+.env.modal
+
+# --- Data / models (RAG artifacts — commit intentionally, not by accident) ---
+qdrant_storage/
+data/
+*.pdf
+
+# --- Misc ---
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.crops/
+backend/.crops/
+
+# spike 페이지 렌더(재생성 가능, 대용량)
+docs/spike-page*.png
