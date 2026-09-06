@@ -50,19 +50,21 @@ def refine(
     instruction: str,
     *,
     text: str,
+    history: list[str] | None = None,
 ) -> NoteDraft:
-    """현재 노트를 후속 지시로 다듬는다. 원문 텍스트를 컨텍스트로 함께 전달."""
-    user = "\n".join(
-        [
-            "[TASK] refine",
-            f"[INSTRUCTION] {instruction}",
-            "[NOTE]",
-            note_markdown,
-            "[SOURCE]",
-            text,
-        ]
-    )
-    out = client.complete([Message("system", _SYSTEM), Message("user", user)])
+    """현재 노트를 후속 지시로 다듬는다. 원문 텍스트 + 최근 지시(history)를 맥락으로 전달(다중턴)."""
+    lines = ["[TASK] refine"]
+    if history:
+        lines.append("[HISTORY]")
+        lines += [f"- {h}" for h in history]
+    lines += [
+        f"[INSTRUCTION] {instruction}",
+        "[NOTE]",
+        note_markdown,
+        "[SOURCE]",
+        text,
+    ]
+    out = client.complete([Message("system", _SYSTEM), Message("user", "\n".join(lines))])
     return _parse_draft(out)
 
 

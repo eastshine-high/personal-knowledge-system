@@ -344,9 +344,9 @@ def test_refine_updates_note_and_preserves_frontmatter():
     # 프론트매터·그림 유지
     assert note.id == before_id and note.source == before_source and note.pages == before_pages
     assert note.figures == before_figs
-    # history 기록
-    assert sess.history[-1]["action"] == "refine"
-    assert sess.history[-1]["instruction"] == "더 짧게 요약해줘"
+    # events 기록
+    assert sess.events[-1].action == "refine"
+    assert sess.events[-1].content == "더 짧게 요약해줘"
 
 
 def test_apply_edit_becomes_basis_for_next_refine():
@@ -354,7 +354,7 @@ def test_apply_edit_becomes_basis_for_next_refine():
     note = sess.start()[0]
     sess.apply_edit(note.id, "내가 직접 쓴 본문이다.")
     assert note.body == "내가 직접 쓴 본문이다."
-    assert sess.history[-1]["action"] == "apply_edit"
+    assert sess.events[-1].action == "apply_edit"
 
     # 이후 refine이 편집본을 기준으로 함 (mock이 현재 본문을 에코)
     sess.refine("보강해줘")
@@ -457,7 +457,7 @@ def test_refine_llm_error_keeps_previous_notes():
         sess.refine("다듬어줘")
     # 이전 노트가 그대로 유지(부분 갱신 없음)
     assert note.body == before_body
-    assert sess.history[-1]["action"] == "start"  # 실패한 refine은 history에 안 남음
+    assert sess.events[-1].action == "start"  # 실패한 refine은 events에 안 남음
 
 
 # --- 번들 내보내기(zip) ---------------------------------------------------
@@ -556,4 +556,78 @@ def test_full_flow_build_refine_edit_export(tmp_path):
         assert "사용자가 확정한 최종 본문." in md          # 직접 편집 최종 반영
         assert "![[Building-AI-Agent-p250-fig1.png]]" in md  # 편집 후에도 md에 임베드 유지
         assert "Building-AI-Agent-p250-fig1.png" in zf.namelist()  # 그림 번들에 포함
-    assert [h["action"] for h in sess.history] == ["start", "refine", "apply_edit"]
+    assert [e.action for e in sess.events] == ["start", "refine", "apply_edit"]
+
+
+# --- ADK 패턴: state / events / 다중턴 맥락 / undo / user 스코프 -----------
+
+def test_state_holds_notes():
+    sess = _session(_ctx())
+    sess.start()
+    assert sess.notes is sess.state["notes"]         # 노트는 state 경유
+    assert sess.events[0].action == "start"
+    assert "notes" in sess.events[0].state_delta      # 이벤트에 상태 스냅샷
+
+
+def test_refine_injects_recent_instructions_as_context():
+    """다중턴: 이전 refine 지시가 다음 refine의 LLM 맥락(HISTORY)에 주입."""
+    spy = _SpyLLMClient()
+    sess = NoteSession(
+        client=spy, context=_ctx(), source="s.pdf", pages=[1],
+        topic="t", guideline=None, created="2026-09-06",
+    )
+    sess.start()
+    sess.refine("첫 지시 A")
+    spy.seen.clear()               # 이후 메시지만 관찰
+    sess.refine("둘째 지시 B")
+    content = spy.all_content()
+    assert "첫 지시 A" in content    # 이전 지시가 맥락으로 들어감
+    assert "둘째 지시 B" in content
+
+
+def test_start_falls_back_to_user_preferred_guideline():
+    sess = NoteSession(
+        client=MockLLMClient(), context=_ctx(), source="s.pdf", pages=[1],
+        topic="t", guideline=None, created="2026-09-06",
+        user_preferred_guideline="수식 중심",
+    )
+    note = sess.start()[0]
+    assert "수식 중심" in note.body   # guideline 미지정이나 user: 취향 폴백
+
+
+def test_undo_reverts_last_change():
+    sess = _session(_ctx(text="원문 텍스트"))
+    sess.start()
+    start_body = sess.notes[0].body
+    sess.refine("불릿으로")
+    assert "[리파인 반영: 불릿으로]" in sess.notes[0].body
+    sess.undo()
+    assert sess.notes[0].body == start_body       # start 시점으로 복원
+    assert sess.events[-1].action == "revert"
+
+
+def test_revert_to_specific_seq():
+    sess = _session(_ctx())
+    sess.start()          # seq 0
+    sess.refine("A")      # seq 1
+    sess.refine("B")      # seq 2
+    a_snapshot_body = sess.events[1].state_delta["notes"][0].body
+    sess.revert_to(1)     # A 시점으로
+    assert sess.notes[0].body == a_snapshot_body
+
+
+def test_undo_without_prior_raises():
+    import pytest
+    sess = _session(_ctx())
+    sess.start()          # 이벤트 1개뿐
+    with pytest.raises(ValueError):
+        sess.undo()
+
+
+def test_temp_state_not_retained():
+    sess = _session(_ctx())
+    sess.start()
+    sess._record_event("refine", "user", "x", extra_delta={"temp:scratch": 1, "topic": "새주제"})
+    assert "temp:scratch" not in sess.state       # temp: 는 영속 state 미잔류
+    assert sess.state["topic"] == "새주제"          # 일반 키는 반영
+    assert sess.events[-1].state_delta.get("temp:scratch") == 1  # 이벤트엔 기록(감사)

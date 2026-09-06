@@ -38,6 +38,21 @@ class NoteDraft:
 
 
 @dataclass
+class SessionEvent:
+    """ADK식 세션 이벤트 — append-only 이력의 한 항목.
+
+    `state_delta`는 이 이벤트로 적용된 변경분(우리 v1은 `notes` 스냅샷 포함)이라, 이벤트를 되짚어
+    특정 시점 상태를 복원(undo/revert)할 수 있다.
+    """
+
+    seq: int
+    author: str          # "user" | "agent" | "system"
+    action: str          # "start" | "refine" | "apply_edit" | "revert"
+    content: str         # 지시문 또는 설명
+    state_delta: dict     # 이 시점의 변경분 (notes 스냅샷 등)
+
+
+@dataclass
 class Note:
     """프론트매터 + 본문 + 첨부 그림을 가진 요약 노트."""
 

@@ -1,7 +1,7 @@
 """노트 조립 + 리파인 엔진 (Sprint 2)."""
 from __future__ import annotations
 
-from .models import Note, NoteDraft, NoteFigure, make_note_id
+from .models import Note, NoteDraft, NoteFigure, SessionEvent, make_note_id
 from .export import export_notes
 from .orchestrate import build_session
 from .prepare import PreparedContext, PreparedFigure, prepare_context
@@ -12,6 +12,7 @@ __all__ = [
     "Note",
     "NoteDraft",
     "NoteFigure",
+    "SessionEvent",
     "make_note_id",
     "PreparedContext",
     "PreparedFigure",

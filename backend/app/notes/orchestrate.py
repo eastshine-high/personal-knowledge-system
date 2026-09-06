@@ -20,6 +20,7 @@ def build_session(
     created: str,
     guideline: str | None = None,
     note_count: int = 1,
+    user_preferred_guideline: str | None = None,
     extractor: LayoutExtractor | None = None,
     client: LLMClient | None = None,
 ) -> NoteSession:
@@ -39,6 +40,7 @@ def build_session(
         topic=topic,
         guideline=guideline,
         created=created,
+        user_preferred_guideline=user_preferred_guideline,
     )
     session.start(note_count=note_count)
     return session
