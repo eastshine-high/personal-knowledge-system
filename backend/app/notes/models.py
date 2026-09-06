@@ -1,0 +1,81 @@
+"""노트 모델 — 프론트매터가 붙은 요약 노트, LLM 초안, 첨부 그림.
+
+프론트매터 스키마(spec 확정): id / title / source / pages / topic / tags / created.
+`id`·`created`는 주입식(결정적) — 테스트 재현성을 위해 외부에서 넣는다.
+"""
+from __future__ import annotations
+
+import hashlib
+from dataclasses import dataclass, field
+
+
+def make_note_id(source: str, pages: list[int], topic: str, index: int = 0) -> str:
+    """source+pages+topic(+노트 index)로 안정적·결정적 노트 ID를 만든다."""
+    key = f"{source}|{','.join(str(p) for p in pages)}|{topic}|{index}"
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+
+
+def _yaml_str(s: str) -> str:
+    """YAML 스칼라를 안전하게 큰따옴표로 감싸고 이스케이프."""
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+@dataclass
+class NoteFigure:
+    """노트에 첨부되는 그림 — 번들 내 파일명 + 원본 크롭 경로(export 복사원) + 캡션."""
+
+    embed_name: str      # 번들/노트에서 참조하는 파일명 (예: Building-AI-Agent-p200-fig1.png)
+    source_path: str     # 원본 figure 크롭 경로 (export 시 복사원)
+    caption: str = ""
+
+
+@dataclass
+class NoteDraft:
+    """LLM(Summarizer)이 내는 초안 — 제목 + 본문(마크다운). 프론트매터는 엔진이 조립."""
+
+    title: str
+    body: str
+
+
+@dataclass
+class Note:
+    """프론트매터 + 본문 + 첨부 그림을 가진 요약 노트."""
+
+    id: str
+    title: str
+    source: str
+    pages: list[int]
+    topic: str
+    created: str                 # ISO 날짜 "YYYY-MM-DD" (주입식)
+    body: str = ""
+    tags: list[str] = field(default_factory=list)
+    figures: list[NoteFigure] = field(default_factory=list)
+
+    def to_markdown(self) -> str:
+        """프론트매터 + 본문 + 그림 섹션을 옵시디언 호환 마크다운으로 렌더.
+
+        그림 임베드(![[..]])는 body가 아니라 `self.figures`(1급 상태)에서 렌더한다.
+        → refine/직접편집이 body만 바꿔도 그림 참조가 항상 유지된다.
+        """
+        pages = "[" + ", ".join(str(p) for p in self.pages) + "]"
+        tags = "[" + ", ".join(_yaml_str(t) for t in self.tags) + "]"
+        parts = [
+            "---",
+            f"id: {self.id}",
+            f"title: {_yaml_str(self.title)}",
+            f"source: {_yaml_str(self.source)}",
+            f"pages: {pages}",
+            f"topic: {_yaml_str(self.topic)}",
+            f"tags: {tags}",
+            f"created: {self.created}",
+            "---",
+            "",
+            self.body.rstrip(),
+        ]
+        if self.figures:
+            embeds = "\n".join(
+                f"![[{f.embed_name}]]" + (f"\n*{f.caption}*" if f.caption else "")
+                for f in self.figures
+            )
+            parts += ["", "## 그림", embeds]
+        return "\n".join(parts) + "\n"
