@@ -1,0 +1,332 @@
+{
+  "predict_seconds": 22.073309659957886,
+  "meta": {
+    "width": 1653,
+    "height": 2337,
+    "labels": [
+      "figure_title",
+      "footer",
+      "header",
+      "image",
+      "number",
+      "paragraph_title",
+      "text",
+      "vision_footnote"
+    ]
+  },
+  "blocks": [
+    {
+      "order": null,
+      "id": 0,
+      "label": "header",
+      "bbox": [
+        95.0,
+        83.0,
+        414.0,
+        118.0
+      ],
+      "content": "Ⅱ부 AI에이전트와 지식 검색"
+    },
+    {
+      "order": 1,
+      "id": 1,
+      "label": "text",
+      "bbox": [
+        246.0,
+        214.0,
+        1207.0,
+        254.0
+      ],
+      "content": "•제한된합리성(limited rationality): 해답을찾을뿐아니라그비용까지고려하는접근"
+    },
+    {
+      "order": 2,
+      "id": 2,
+      "label": "text",
+      "bbox": [
+        245.0,
+        278.0,
+        1501.0,
+        373.0
+      ],
+      "content": "휴리스틱탐색(heuristic search): 검색 공간을 줄여 전역 최적해는 아닐 수 있어도, 국소 최적해에 해당하는 준최\n적갑 semi-optimal solution 을 찾아내는 방식"
+    },
+    {
+      "order": 3,
+      "id": 3,
+      "label": "text",
+      "bbox": [
+        181.0,
+        422.0,
+        1502.0,
+        600.0
+      ],
+      "content": "이 두 가지 원칙은 이후 정보 검색을 더 효율적이고 현실적으로 만드는 다양한 알고리즘의 기반이 되었다. 특히 인터넷이 폭발적으로 성장하던 1990년대 후반, 빠르고 정확한 웹 검색의 필요성이 커지면서 다시 큰 주목을 받게 되었다."
+    },
+    {
+      "order": 4,
+      "id": 4,
+      "label": "text",
+      "bbox": [
+        210.0,
+        624.0,
+        1288.0,
+        669.0
+      ],
+      "content": "데이터 관점에서 보면 월드와이드웹은 다음 세 가지 기술적 원칙에 기반하고 있다."
+    },
+    {
+      "order": 5,
+      "id": 5,
+      "label": "text",
+      "bbox": [
+        242.0,
+        729.0,
+        1138.0,
+        769.0
+      ],
+      "content": "• 분산된 데이터: 데이터가 전 세계에 분산되어 있으며 어디서든 접근할 수 있다."
+    },
+    {
+      "order": 6,
+      "id": 6,
+      "label": "text",
+      "bbox": [
+        244.0,
+        793.0,
+        1501.0,
+        887.0
+      ],
+      "content": "연결된 데이터: 데이터는 고립되어 있지 않고 서로 연결돼 있으며 데이터의 의미는 이들 연결 관계에 따라 달라진다."
+    },
+    {
+      "order": 7,
+      "id": 7,
+      "label": "text",
+      "bbox": [
+        244.0,
+        911.0,
+        1500.0,
+        1007.0
+      ],
+      "content": "시맨틱 메타데이터: 데이터 자체 외에도 관계를 설명하는 정보가 함께 존재하며, 이러한 메타데이터가 효율적인 검색을 가능하게 한다."
+    },
+    {
+      "order": 8,
+      "id": 8,
+      "label": "text",
+      "bbox": [
+        174.0,
+        1054.0,
+        908.0,
+        1370.0
+      ],
+      "content": "이러한 이유로 이들 새로운 데이터 특성을 반영할 수 있는 기술을 모색하는 움직임이 시작되었고, 자연스럽게 그래프 기반 표현 방식에 관심이 쏠렸다. 그래프는 본질적으로 서로 다른 엔티티 간의 관계를 모델링하는 구조이기 때문이다."
+    },
+    {
+      "order": 9,
+      "id": 9,
+      "label": "text",
+      "bbox": [
+        174.0,
+        1392.0,
+        906.0,
+        1775.0
+      ],
+      "content": "이 접근법은 2012년, 구글이 검색 개념마다 지식 카드 knowledge card 를 도입하면서 웹 검색에 처음 적용되기 시작했다. 지식 카드는 개체명\\_{entity}들의 그래프로 볼 수 있으며, 이들 간의 연결이 곧 그래프의 링크\\_{link}에 해당한다. 이러한 카드는 보다 관련성 높은 검색 결과를 제공하고 사용자 편의성을 높인다."
+    },
+    {
+      "order": 10,
+      "id": 10,
+      "label": "text",
+      "bbox": [
+        173.0,
+        1796.0,
+        903.0,
+        2046.0
+      ],
+      "content": "그 이후로 지식 그래프 knowledge graph 라는 용어는 엔티티\n들을 일련의 의미 있는 관계로 연결하는 그래프를 가리\n키게 되었다. 여기서 말하는 관계는 일반적으로 엔티티\n간의 의미적 관계semantic relationships를 나타낸다."
+    },
+    {
+      "order": 11,
+      "id": 11,
+      "label": "paragraph_title",
+      "bbox": [
+        949.0,
+        1082.0,
+        1035.0,
+        1116.0
+      ],
+      "content": "About"
+    },
+    {
+      "order": 12,
+      "id": 12,
+      "label": "text",
+      "bbox": [
+        946.0,
+        1137.0,
+        1469.0,
+        1323.0
+      ],
+      "content": "Napoleon Bonaparte, later known by his regnal name Napoleon I, was a French military officer and statesman who rose to prominence during the French Revolution and led a series of successful campaigns across Europe during the French Revolutionary and Napoleonic Wars from 1796 to 1815. Wikipedia"
+    },
+    {
+      "order": 13,
+      "id": 13,
+      "label": "text",
+      "bbox": [
+        946.0,
+        1346.0,
+        1470.0,
+        1683.0
+      ],
+      "content": "Born: August 15, 1769, Ajaccio\nDied: May 5, 1821 (age 51 years), Longwood House, Longwood, Saint Helena, Ascension and Tristan da Cunha\nSpouse: Marie Louise, Duchess of Parma (m. 1810–1821), Joséphine de Beauharnais (m. 1796–1809)\nBuried: December 15, 1840, Hōtel des Invalides, Paris\nChildren: Napoleon II, Charles Léon, Charlotte Chappuis, Alexandre Colonna-Walewski\nMovies: Le mémorial de Sainte-Hélène"
+    },
+    {
+      "order": 14,
+      "id": 14,
+      "label": "text",
+      "bbox": [
+        1395.0,
+        1681.0,
+        1474.0,
+        1702.0
+      ],
+      "content": "Feedback"
+    },
+    {
+      "order": null,
+      "id": 15,
+      "label": "figure_title",
+      "bbox": [
+        950.0,
+        1732.0,
+        1209.0,
+        1763.0
+      ],
+      "content": "People also search for"
+    },
+    {
+      "order": null,
+      "id": 16,
+      "label": "image",
+      "bbox": [
+        952.0,
+        1777.0,
+        1072.0,
+        1897.0
+      ],
+      "content": ""
+    },
+    {
+      "order": null,
+      "id": 17,
+      "label": "vision_footnote",
+      "bbox": [
+        949.0,
+        1907.0,
+        1048.0,
+        1956.0
+      ],
+      "content": "Joséphine\nde..."
+    },
+    {
+      "order": null,
+      "id": 18,
+      "label": "image",
+      "bbox": [
+        1088.0,
+        1777.0,
+        1206.0,
+        1898.0
+      ],
+      "content": ""
+    },
+    {
+      "order": null,
+      "id": 19,
+      "label": "vision_footnote",
+      "bbox": [
+        1085.0,
+        1906.0,
+        1191.0,
+        1939.0
+      ],
+      "content": "Napoleon II"
+    },
+    {
+      "order": null,
+      "id": 20,
+      "label": "image",
+      "bbox": [
+        1219.0,
+        1776.0,
+        1340.0,
+        1898.0
+      ],
+      "content": ""
+    },
+    {
+      "order": null,
+      "id": 21,
+      "label": "vision_footnote",
+      "bbox": [
+        1218.0,
+        1907.0,
+        1329.0,
+        1949.0
+      ],
+      "content": "Napoleon III"
+    },
+    {
+      "order": null,
+      "id": 22,
+      "label": "image",
+      "bbox": [
+        1354.0,
+        1777.0,
+        1473.0,
+        1898.0
+      ],
+      "content": ""
+    },
+    {
+      "order": null,
+      "id": 23,
+      "label": "vision_footnote",
+      "bbox": [
+        1352.0,
+        1908.0,
+        1472.0,
+        1957.0
+      ],
+      "content": "Marie Louise, Duchess..."
+    },
+    {
+      "order": null,
+      "id": 24,
+      "label": "footer",
+      "bbox": [
+        1083.0,
+        2027.0,
+        1341.0,
+        2061.0
+      ],
+      "content": "그림7.1 구글의 지식 카드"
+    },
+    {
+      "order": null,
+      "id": 25,
+      "label": "number",
+      "bbox": [
+        168.0,
+        2211.0,
+        225.0,
+        2245.0
+      ],
+      "content": "250"
+    }
+  ],
+  "markdown": "•제한된합리성(limited rationality): 해답을찾을뿐아니라그비용까지고려하는접근\n\n휴리스틱탐색(heuristic search): 검색 공간을 줄여 전역 최적해는 아닐 수 있어도, 국소 최적해에 해당하는 준최\n\n적갑 semi-optimal solution 을 찾아내는 방식\n\n이 두 가지 원칙은 이후 정보 검색을 더 효율적이고 현실적으로 만드는 다양한 알고리즘의 기반이 되었다. 특히 인터넷이 폭발적으로 성장하던 1990년대 후반, 빠르고 정확한 웹 검색의 필요성이 커지면서 다시 큰 주목을 받게 되었다.\n\n데이터 관점에서 보면 월드와이드웹은 다음 세 가지 기술적 원칙에 기반하고 있다.\n\n• 분산된 데이터: 데이터가 전 세계에 분산되어 있으며 어디서든 접근할 수 있다.\n\n연결된 데이터: 데이터는 고립되어 있지 않고 서로 연결돼 있으며 데이터의 의미는 이들 연결 관계에 따라 달라진다.\n\n시맨틱 메타데이터: 데이터 자체 외에도 관계를 설명하는 정보가 함께 존재하며, 이러한 메타데이터가 효율적인 검색을 가능하게 한다.\n\n이러한 이유로 이들 새로운 데이터 특성을 반영할 수 있는 기술을 모색하는 움직임이 시작되었고, 자연스럽게 그래프 기반 표현 방식에 관심이 쏠렸다. 그래프는 본질적으로 서로 다른 엔티티 간의 관계를 모델링하는 구조이기 때문이다.\n\n이 접근법은 2012년, 구글이 검색 개념마다 지식 카드 knowledge card 를 도입하면서 웹 검색에 처음 적용되기 시작했다. 지식 카드는 개체명\\_{entity}들의 그래프로 볼 수 있으며, 이들 간의 연결이 곧 그래프의 링크\\_{link}에 해당한다. 이러한 카드는 보다 관련성 높은 검색 결과를 제공하고 사용자 편의성을 높인다.\n\n그 이후로 지식 그래프 knowledge graph 라는 용어는 엔티티\n\n들을 일련의 의미 있는 관계로 연결하는 그래프를 가리\n\n키게 되었다. 여기서 말하는 관계는 일반적으로 엔티티\n\n간의 의미적 관계semantic relationships를 나타낸다.\n\n## About\n\nNapoleon Bonaparte, later known by his regnal name Napoleon I, was a French military officer and statesman who rose to prominence during the French Revolution and led a series of successful campaigns across Europe during the French Revolutionary and Napoleonic Wars from 1796 to 1815. Wikipedia\n\nBorn: August 15, 1769, Ajaccio\n\nDied: May 5, 1821 (age 51 years), Longwood House, Longwood, Saint Helena, Ascension and Tristan da Cunha\n\nSpouse: Marie Louise, Duchess of Parma (m. 1810–1821), Joséphine de Beauharnais (m. 1796–1809)\n\nBuried: December 15, 1840, Hōtel des Invalides, Paris\n\nChildren: Napoleon II, Charles Léon, Charlotte Chappuis, Alexandre Colonna-Walewski\n\nMovies: Le mémorial de Sainte-Hélène\n\nFeedback\n\n<div style=\"text-align: center;\">People also search for</div>\n\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_952_1777_1072_1897.jpg\" alt=\"Image\" width=\"7%\" /></div>\n\n\nJoséphine\n\nde...\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_1088_1777_1206_1898.jpg\" alt=\"Image\" width=\"7%\" /></div>\n\n\nNapoleon II\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_1219_1776_1340_1898.jpg\" alt=\"Image\" width=\"7%\" /></div>\n\n\nNapoleon III\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_1354_1777_1473_1898.jpg\" alt=\"Image\" width=\"7%\" /></div>\n\n\nMarie Louise, Duchess..."
+}

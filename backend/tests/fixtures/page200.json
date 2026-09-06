@@ -1,0 +1,174 @@
+{
+  "predict_seconds": 9.11878514289856,
+  "meta": {
+    "width": 1653,
+    "height": 2337,
+    "labels": [
+      "algorithm",
+      "figure_title",
+      "header",
+      "image",
+      "number",
+      "text"
+    ]
+  },
+  "blocks": [
+    {
+      "order": null,
+      "id": 0,
+      "label": "header",
+      "bbox": [
+        89.0,
+        84.0,
+        409.0,
+        119.0
+      ],
+      "content": "Ⅱ부 AI에이전트와 지식 검색"
+    },
+    {
+      "order": 1,
+      "id": 1,
+      "label": "algorithm",
+      "bbox": [
+        232.0,
+        207.0,
+        1423.0,
+        350.0
+      ],
+      "content": "print(f\"Inserted batch {i//batch_size + 1}/{(len(chunked_df)-1)//batch_size + 1}\")"
+    },
+    {
+      "order": 2,
+      "id": 2,
+      "label": "text",
+      "bbox": [
+        173.0,
+        424.0,
+        981.0,
+        605.0
+      ],
+      "content": "지금까지는앞에서설명한파이프라인의첫부분만구현한\n상태다.현재RAG벡터가저장된데이터베이스를보유하고\n있다.\n여기서메타데이터를추가할수도\n있다는점에주목하자(이경우에는영화\n제목)."
+    },
+    {
+      "order": 3,
+      "id": 3,
+      "label": "text",
+      "bbox": [
+        1033.0,
+        425.0,
+        1462.0,
+        566.0
+      ],
+      "content": ""
+    },
+    {
+      "order": null,
+      "id": 4,
+      "label": "image",
+      "bbox": [
+        282.0,
+        673.0,
+        1380.0,
+        1272.0
+      ],
+      "content": ""
+    },
+    {
+      "order": null,
+      "id": 5,
+      "label": "figure_title",
+      "bbox": [
+        581.0,
+        1329.0,
+        1039.0,
+        1367.0
+      ],
+      "content": "그림 5.21 벡터 데이터베이스 파이프라인"
+    },
+    {
+      "order": 4,
+      "id": 6,
+      "label": "text",
+      "bbox": [
+        172.0,
+        1439.0,
+        1496.0,
+        1621.0
+      ],
+      "content": "이제 사용자가 질문을 입력했을 때 추론 단계에서 동작할 파이프라인을 만들어야 한다. 여기서는 질의에 대한 벡터를 생성하고 벡터 데이터베이스에서 가장 유사한 상위 k개의 벡터를 검색한다. 이후 이렇게 반환된 텍스트를 LLM에 전달하여 질의에 대한 답변을 생성한다."
+    },
+    {
+      "order": 5,
+      "id": 7,
+      "label": "text",
+      "bbox": [
+        171.0,
+        1642.0,
+        1495.0,
+        1754.0
+      ],
+      "content": "4. 여기서는 청크를 찾을 때 사용했던 것과 동일한 임베딩 모델을 사용하므로, 다음과 같은 기능을 수행하는 함수가 필요하다."
+    },
+    {
+      "order": 6,
+      "id": 8,
+      "label": "text",
+      "bbox": [
+        236.0,
+        1812.0,
+        605.0,
+        1853.0
+      ],
+      "content": "질의에 대한 벡터를 생성한다."
+    },
+    {
+      "order": 7,
+      "id": 9,
+      "label": "text",
+      "bbox": [
+        235.0,
+        1877.0,
+        580.0,
+        1918.0
+      ],
+      "content": "가장 유사한 문서를 찾는다."
+    },
+    {
+      "order": 8,
+      "id": 10,
+      "label": "text",
+      "bbox": [
+        234.0,
+        1941.0,
+        549.0,
+        1981.0
+      ],
+      "content": "관련 텍스트를 반환한다."
+    },
+    {
+      "order": 9,
+      "id": 11,
+      "label": "algorithm",
+      "bbox": [
+        199.0,
+        2049.0,
+        1089.0,
+        2135.0
+      ],
+      "content": "def retrieve_documents(query, collection, top_k=5):\n    query_embedding = sentence_model.encode(query).tolist()"
+    },
+    {
+      "order": null,
+      "id": 12,
+      "label": "number",
+      "bbox": [
+        164.0,
+        2212.0,
+        220.0,
+        2245.0
+      ],
+      "content": "200"
+    }
+  ],
+  "markdown": "print(f\"Inserted batch {i//batch_size + 1}/{(len(chunked_df)-1)//batch_size + 1}\")\n\n지금까지는앞에서설명한파이프라인의첫부분만구현한\n\n상태다.현재RAG벡터가저장된데이터베이스를보유하고\n\n있다.\n\n여기서메타데이터를추가할수도\n\n있다는점에주목하자(이경우에는영화\n\n제목).\n\n\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_282_673_1380_1272.jpg\" alt=\"Image\" width=\"66%\" /></div>\n\n\n<div style=\"text-align: center;\">그림 5.21 벡터 데이터베이스 파이프라인</div>\n\n\n이제 사용자가 질문을 입력했을 때 추론 단계에서 동작할 파이프라인을 만들어야 한다. 여기서는 질의에 대한 벡터를 생성하고 벡터 데이터베이스에서 가장 유사한 상위 k개의 벡터를 검색한다. 이후 이렇게 반환된 텍스트를 LLM에 전달하여 질의에 대한 답변을 생성한다.\n\n4. 여기서는 청크를 찾을 때 사용했던 것과 동일한 임베딩 모델을 사용하므로, 다음과 같은 기능을 수행하는 함수가 필요하다.\n\n질의에 대한 벡터를 생성한다.\n\n가장 유사한 문서를 찾는다.\n\n관련 텍스트를 반환한다.\n\ndef retrieve_documents(query, collection, top_k=5):\n    query_embedding = sentence_model.encode(query).tolist()"
+}
