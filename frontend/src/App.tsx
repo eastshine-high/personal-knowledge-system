@@ -3,6 +3,7 @@ import type { NoteResponse, SessionResponse } from "./types";
 import InputForm from "./components/InputForm";
 import PdfViewer from "./components/PdfViewer";
 import NotePanel from "./components/NotePanel";
+import RefineChat from "./components/RefineChat";
 
 export default function App() {
   const [session, setSession] = useState<SessionResponse | null>(null);
@@ -38,7 +39,12 @@ export default function App() {
             onNoteUpdated={handleNoteUpdated}
           />
         )}
-        <p style={styles.placeholder}>리파인 · undo · 내보내기 (F5~F6)</p>
+        <RefineChat
+          sessionId={session.session_id}
+          events={session.events}
+          onSessionUpdated={setSession}
+        />
+        <p style={styles.placeholder}>undo · 내보내기 (F6)</p>
       </section>
     </main>
   );
@@ -68,7 +74,10 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     padding: 16,
     overflowY: "auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
   },
-  panelTitle: { margin: "0 0 12px", fontSize: 16, fontWeight: 600 },
-  placeholder: { color: "#999", fontSize: 13 },
+  panelTitle: { margin: 0, fontSize: 16, fontWeight: 600 },
+  placeholder: { margin: 0, color: "#999", fontSize: 13 },
 };
