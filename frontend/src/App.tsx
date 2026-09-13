@@ -4,6 +4,7 @@ import InputForm from "./components/InputForm";
 import PdfViewer from "./components/PdfViewer";
 import NotePanel from "./components/NotePanel";
 import RefineChat from "./components/RefineChat";
+import Toolbar from "./components/Toolbar";
 
 export default function App() {
   const [session, setSession] = useState<SessionResponse | null>(null);
@@ -31,7 +32,10 @@ export default function App() {
         <PdfViewer sessionId={session.session_id} pages={session.notes[0]?.pages ?? []} />
       </section>
       <section style={styles.right}>
-        <h2 style={styles.panelTitle}>작업 패널</h2>
+        <div style={styles.panelHeader}>
+          <h2 style={styles.panelTitle}>작업 패널</h2>
+          <Toolbar sessionId={session.session_id} onSessionUpdated={setSession} />
+        </div>
         {session.notes[0] && (
           <NotePanel
             sessionId={session.session_id}
@@ -44,7 +48,6 @@ export default function App() {
           events={session.events}
           onSessionUpdated={setSession}
         />
-        <p style={styles.placeholder}>undo · 내보내기 (F6)</p>
       </section>
     </main>
   );
@@ -78,6 +81,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     gap: 12,
   },
+  panelHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   panelTitle: { margin: 0, fontSize: 16, fontWeight: 600 },
-  placeholder: { margin: 0, color: "#999", fontSize: 13 },
 };
