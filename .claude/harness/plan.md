@@ -28,10 +28,15 @@ PDF 경로+범위+주제를 입력하면 노트가 생성되고, 채팅 패널�
 ## 작업 단위
 
 ### 백엔드 (FastAPI 엔드포인트)
-- **B0** — 연속 undo 버그 수정: `undo()`가 `revert` 이벤트 건너뛰고 실질 변경 기준 탐색
+- **B0** — 연속 undo 버그 수정: `_current_seq` int 포인터로 현재 노트 상태의 이벤트 위치 추적
   ```python
-  real = [e for e in self.events if e.action != "revert"]
-  return self.revert_to(real[-2].seq)
+  # NoteSession에 _current_seq: int = -1 포인터 추가
+  # start/refine/apply_edit 각각: self._current_seq = len(self.events) - 1
+  # revert_to(seq): self._current_seq = seq
+  def undo(self):
+      if self._current_seq < 1:
+          raise ValueError("되돌릴 이력이 없습니다")
+      return self.revert_to(self._current_seq - 1)
   ```
 - **B1** — 인메모리 세션 스토어 + `POST /sessions` (build_session 배선, session_id 반환)
 - **B2** — 노트·리파인 엔드포인트: `GET /sessions/{id}/notes`, `POST /sessions/{id}/refine`, `POST /sessions/{id}/notes/{note_id}/edit`, `POST /sessions/{id}/undo`
@@ -55,15 +60,15 @@ PDF 경로+범위+주제를 입력하면 노트가 생성되고, 채팅 패널�
 - **E5** — 내보내기: 내보내기 버튼 클릭 → zip 다운로드 트리거 확인
 
 ## 완료 조건 (관찰 가능)
-- [ ] 입력 폼에서 PDF 경로+범위+주제 입력 후 노트 생성 가능
-- [ ] PDF 뷰어에 페이지 이미지 표시, 이전/다음 페이지 동작
-- [ ] 채팅 패널에서 instruction 입력 → 노트 갱신 → events 히스토리에 표시
-- [ ] undo 연속 2회: 순방향 역재생(오실레이션 없음) — **B0 수정 포함**
-- [ ] 직접 편집 → apply_edit → 다음 refine에 반영
-- [ ] 내보내기 버튼 → zip 다운로드
-- [ ] 잘못된 PDF 경로 → 오류 메시지 표시
-- [ ] Playwright E2E: E1~E5 모두 PASS (`npm run test:e2e`)
-- [ ] 기존 **63 pytest PASS 유지** (B0 포함 변경 후)
+- [x] 입력 폼에서 PDF 경로+범위+주제 입력 후 노트 생성 가능
+- [x] PDF 뷰어에 페이지 이미지 표시, 이전/다음 페이지 동작
+- [x] 채팅 패널에서 instruction 입력 → 노트 갱신 → events 히스토리에 표시
+- [x] undo 연속 2회: 순방향 역재생(오실레이션 없음) — **B0 수정 포함**
+- [x] 직접 편집 → apply_edit → 다음 refine에 반영
+- [x] 내보내기 버튼 → zip 다운로드
+- [x] 잘못된 PDF 경로 → 오류 메시지 표시
+- [x] Playwright E2E: E1~E5 모두 PASS (`npm run test:e2e`) — 6/6 PASS
+- [x] 기존 **pytest 76 PASS 유지** (Sprint 3 신규 13개 포함)
 
 ## 테스트 케이스
 | # | 시나리오 | 입력 | 기대 |
@@ -78,7 +83,7 @@ PDF 경로+범위+주제를 입력하면 노트가 생성되고, 채팅 패널�
 | 8 | mock 격리 | page.route 전체 mock | 백엔드 없이 E2E PASS |
 
 ## 하드 임계값
-- 기존 pytest: **63 passed 유지** (B0 수정 후 재확인)
+- 기존 pytest: **76 passed 유지** (Sprint 3 신규 13개 포함, B0 수정 후 재확인)
 - E2E: E1~E5 전부 PASS (`npm run test:e2e`)
 - 빌드: `npm run build` 오류 없음
 - CORS: 프론트엔드 → 백엔드 API 호출 정상
@@ -95,7 +100,7 @@ PDF 경로+범위+주제를 입력하면 노트가 생성되고, 채팅 패널�
 - **마이그레이션**: 없음
 
 ## 사용자 Sign-off
-- [ ] 사용자가 명시적으로 확인함
+- [x] 사용자가 명시적으로 확인함
 
 ## TODO (향후 과제)
 - **전사 PKS 확장**: 파일 업로드(로컬 경로 → multipart), PostgreSQL 세션 스토어, 최소 인증(API 키 또는 SSO), 다중 사용자 세션 격리
@@ -103,6 +108,7 @@ PDF 경로+범위+주제를 입력하면 노트가 생성되고, 채팅 패널�
 ## 변경 이력
 - 2026-09-13: 초안 작성. 설계 확정: 백엔드 렌더 이미지·로컬 경로·인메모리 스토어. 연속 undo 버그(B0) 이번 스프린트 수정 포함.
 - 2026-09-13: 전사 PKS 확장을 Sprint 4에서 TODO로 이동.
+- 2026-09-13: /evaluate PASS — B0 코드 스니펫을 `_current_seq` 포인터 방식으로 갱신, pytest 임계값 63→76 갱신, 완료 조건 체크박스 체크.
 
 ## 참조
 - spec: `.claude/harness/spec.md`
