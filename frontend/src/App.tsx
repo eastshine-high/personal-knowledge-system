@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { NoteResponse, SessionResponse } from "./types";
 import InputForm from "./components/InputForm";
 import PdfViewer from "./components/PdfViewer";
@@ -8,6 +8,12 @@ import Toolbar from "./components/Toolbar";
 
 export default function App() {
   const [session, setSession] = useState<SessionResponse | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+
+  // 새 세션이 생성될 때 첫 번째 노트 선택
+  useEffect(() => {
+    if (session) setSelectedNoteId(session.notes[0]?.id ?? null);
+  }, [session?.session_id]);
 
   const handleNoteUpdated = (updated: NoteResponse) => {
     setSession((prev) =>
@@ -25,21 +31,42 @@ export default function App() {
     );
   }
 
+  const currentNote =
+    session.notes.find((n) => n.id === selectedNoteId) ?? session.notes[0] ?? null;
+  const multiNote = session.notes.length > 1;
+
   return (
     <main style={styles.workspace}>
       <section style={styles.left}>
         <h2 style={styles.panelTitle}>소스 패널</h2>
-        <PdfViewer sessionId={session.session_id} pages={session.notes[0]?.pages ?? []} />
+        <PdfViewer sessionId={session.session_id} pages={currentNote?.pages ?? []} />
       </section>
       <section style={styles.right}>
         <div style={styles.panelHeader}>
           <h2 style={styles.panelTitle}>작업 패널</h2>
           <Toolbar sessionId={session.session_id} onSessionUpdated={setSession} />
         </div>
-        {session.notes[0] && (
+
+        {multiNote && (
+          <div style={styles.tabBar} role="tablist">
+            {session.notes.map((note, idx) => (
+              <button
+                key={note.id}
+                role="tab"
+                aria-selected={note.id === currentNote?.id}
+                style={note.id === currentNote?.id ? styles.tabActive : styles.tab}
+                onClick={() => setSelectedNoteId(note.id)}
+              >
+                {note.title || `노트 ${idx + 1}`}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {currentNote && (
           <NotePanel
             sessionId={session.session_id}
-            note={session.notes[0]}
+            note={currentNote}
             onNoteUpdated={handleNoteUpdated}
           />
         )}
@@ -83,4 +110,40 @@ const styles: Record<string, React.CSSProperties> = {
   },
   panelHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   panelTitle: { margin: 0, fontSize: 16, fontWeight: 600 },
+  tabBar: {
+    display: "flex",
+    gap: 4,
+    borderBottom: "1px solid #e0e0e0",
+    paddingBottom: 0,
+  },
+  tab: {
+    padding: "6px 14px",
+    background: "none",
+    border: "1px solid #e0e0e0",
+    borderBottom: "none",
+    borderRadius: "4px 4px 0 0",
+    fontSize: 13,
+    cursor: "pointer",
+    color: "#666",
+    whiteSpace: "nowrap" as const,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    maxWidth: 160,
+  },
+  tabActive: {
+    padding: "6px 14px",
+    background: "#fff",
+    border: "1px solid #e0e0e0",
+    borderBottom: "1px solid #fff",
+    borderRadius: "4px 4px 0 0",
+    fontSize: 13,
+    cursor: "pointer",
+    color: "#1a1a1a",
+    fontWeight: 600,
+    whiteSpace: "nowrap" as const,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    maxWidth: 160,
+    marginBottom: -1,
+  },
 };
