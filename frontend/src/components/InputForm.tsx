@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createSession, ApiError } from "../api";
 import type { SessionResponse } from "../types";
 
 interface Props {
   onSessionCreated: (session: SessionResponse) => void;
 }
+
+const STATUS_STAGES: [number, string][] = [
+  [0,     "레이아웃 추출 중…"],
+  [8000,  "LLM 요약 중…"],
+  [30000, "GPU 예열 중일 수 있습니다 (최대 90초)…"],
+];
 
 export default function InputForm({ onSessionCreated }: Props) {
   const [pdfPath, setPdfPath] = useState("");
@@ -15,11 +21,24 @@ export default function InputForm({ onSessionCreated }: Props) {
   const [noteCount, setNoteCount] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
+
+    setStatusMsg(STATUS_STAGES[0][1] as string);
+    STATUS_STAGES.slice(1).forEach(([delay, msg]) => {
+      timersRef.current.push(setTimeout(() => setStatusMsg(msg as string), delay as number));
+    });
+
     try {
       const session = await createSession({
         pdf_path: pdfPath,
@@ -34,6 +53,8 @@ export default function InputForm({ onSessionCreated }: Props) {
       setError(err instanceof ApiError ? err.message : "알 수 없는 오류가 발생했습니다.");
     } finally {
       setLoading(false);
+      clearTimers();
+      setStatusMsg(null);
     }
   };
 
@@ -116,6 +137,8 @@ export default function InputForm({ onSessionCreated }: Props) {
       <button style={loading ? styles.buttonDisabled : styles.button} type="submit" disabled={loading}>
         {loading ? "노트 생성 중…" : "노트 생성"}
       </button>
+
+      {statusMsg && <p style={styles.status}>{statusMsg}</p>}
     </form>
   );
 }
@@ -148,6 +171,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   row: { display: "flex", gap: 12 },
   error: { margin: 0, fontSize: 13, color: "#d32f2f" },
+  status: { margin: 0, fontSize: 13, color: "#555", textAlign: "center" as const },
   button: {
     padding: "10px 0",
     background: "#1a1a1a",
