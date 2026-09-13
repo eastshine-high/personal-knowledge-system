@@ -50,6 +50,7 @@ class NoteSession:
         if user_preferred_guideline is not None:
             self.state["user:preferred_guideline"] = user_preferred_guideline
         self.events: list[SessionEvent] = []
+        self._current_seq: int = -1  # 현재 노트 상태가 대응하는 이벤트 seq
 
     @property
     def notes(self) -> list[Note]:
@@ -71,6 +72,7 @@ class NoteSession:
             for i, draft in enumerate(drafts)
         ]
         self._record_event("start", "agent", f"note_count={note_count}")
+        self._current_seq = len(self.events) - 1
         return self.notes
 
     def refine(self, instruction: str, *, note_id: str | None = None) -> list[Note]:
@@ -94,6 +96,7 @@ class NoteSession:
             note.title = draft.title
             note.body = draft.body
         self._record_event("refine", "user", instruction)
+        self._current_seq = len(self.events) - 1
         return targets
 
     def apply_edit(self, note_id: str, body: str, *, title: str | None = None) -> Note:
@@ -105,6 +108,7 @@ class NoteSession:
         if title is not None:
             note.title = title
         self._record_event("apply_edit", "user", "직접 편집")
+        self._current_seq = len(self.events) - 1
         return note
 
     def export(self, out_zip_path: str) -> str:
@@ -120,13 +124,14 @@ class NoteSession:
             raise ValueError(f"잘못된 seq: {seq}")
         self.state["notes"] = copy.deepcopy(self.events[seq].state_delta["notes"])
         self._record_event("revert", "user", f"seq {seq}로 복원")
+        self._current_seq = seq  # 복원된 시점의 seq가 현재 상태
         return self.notes
 
     def undo(self) -> list[Note]:
-        """직전 변경을 되돌린다(바로 이전 이벤트 상태로)."""
-        if len(self.events) < 2:
+        """직전 변경을 되돌린다. _current_seq 포인터를 한 단계 뒤로."""
+        if self._current_seq < 1:
             raise ValueError("되돌릴 이전 상태가 없음")
-        return self.revert_to(len(self.events) - 2)
+        return self.revert_to(self._current_seq - 1)
 
     # --- 내부 ----------------------------------------------------------
     def _record_event(self, action: str, author: str, content: str, extra_delta: dict | None = None) -> None:

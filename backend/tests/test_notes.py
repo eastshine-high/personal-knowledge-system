@@ -624,6 +624,29 @@ def test_undo_without_prior_raises():
         sess.undo()
 
 
+def test_undo_sequential_no_oscillation():
+    """연속 undo가 오실레이션 없이 역방향으로 진행된다."""
+    sess = _session(_ctx(text="원문 텍스트"))
+    sess.start()
+    start_body = sess.notes[0].body
+
+    sess.refine("A 지시")
+    body_after_a = sess.notes[0].body
+
+    sess.refine("B 지시")
+    body_after_b = sess.notes[0].body
+
+    assert body_after_b != body_after_a     # refine이 실제로 바뀜
+
+    # 첫 번째 undo: B → A
+    sess.undo()
+    assert sess.notes[0].body == body_after_a
+
+    # 두 번째 undo: A → start (오실레이션 없음)
+    sess.undo()
+    assert sess.notes[0].body == start_body
+
+
 def test_temp_state_not_retained():
     sess = _session(_ctx())
     sess.start()
