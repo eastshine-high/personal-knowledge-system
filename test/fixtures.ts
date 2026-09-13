@@ -44,6 +44,27 @@ export const MOCK_SESSION_AFTER_UNDO = {
   ],
 };
 
+export const NOTE_ID_2 = "note-def456abc789";
+
+export const MOCK_NOTE_2 = {
+  id: NOTE_ID_2,
+  title: "어텐션 헤드",
+  source: "test.pdf",
+  pages: [201],
+  topic: "셀프 어텐션",
+  created: "2026-09-13",
+  body: "멀티헤드 어텐션은 여러 표현 공간에서 동시에 정보를 처리한다.",
+  tags: [],
+  figures: [],
+  markdown: `---\nid: ${NOTE_ID_2}\ntitle: "어텐션 헤드"\n---\n\n멀티헤드 어텐션은 여러 표현 공간에서 동시에 정보를 처리한다.\n`,
+};
+
+export const MOCK_SESSION_TWO_NOTES = {
+  session_id: SESSION_ID,
+  notes: [MOCK_NOTE, MOCK_NOTE_2],
+  events: [{ seq: 0, author: "agent", action: "start", content: "note_count=2" }],
+};
+
 /** 1×1 투명 PNG */
 export const TINY_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
