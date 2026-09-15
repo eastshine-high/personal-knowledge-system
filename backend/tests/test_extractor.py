@@ -266,6 +266,7 @@ def _settings(backend):
         warmup=False,
         fixtures_dir="/tmp/fixtures",
         llm_backend="mock",
+        llm_model="claude-sonnet-4-6",
     )
 
 

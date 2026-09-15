@@ -40,6 +40,7 @@ class Settings:
     warmup: bool                # 추출 전 /health 핑으로 콜드스타트 흡수 (콜드에서도 <90초 유지)
     fixtures_dir: str           # EXTRACT_BACKEND=fixture 시 재생할 캡처 응답 디렉토리
     llm_backend: str            # 요약/리파인 LLM: "mock" | "anthropic" | "openai" | "local"
+    llm_model: str              # Anthropic 모델 ID (llm_backend=anthropic 시 사용)
 
 
 def get_settings() -> Settings:
@@ -57,4 +58,5 @@ def get_settings() -> Settings:
         warmup=os.getenv("EXTRACT_WARMUP", "1") not in ("0", "false", "False", ""),
         fixtures_dir=os.getenv("FIXTURES_DIR", str(_ENV_FILE.parent / "tests" / "fixtures")),
         llm_backend=os.getenv("LLM_BACKEND", "mock"),
+        llm_model=os.getenv("LLM_MODEL", "claude-sonnet-4-6"),
     )

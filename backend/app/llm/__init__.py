@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from ..config import Settings, get_settings
-from .client import LLMClient, Message, MockLLMClient
+from .client import AnthropicLLMClient, LLMClient, Message, MockLLMClient
 
-__all__ = ["LLMClient", "Message", "MockLLMClient", "get_llm_client"]
+__all__ = ["AnthropicLLMClient", "LLMClient", "Message", "MockLLMClient", "get_llm_client"]
 
 
 def get_llm_client(settings: Settings | None = None) -> LLMClient:
@@ -12,6 +12,8 @@ def get_llm_client(settings: Settings | None = None) -> LLMClient:
     s = settings or get_settings()
     if s.llm_backend == "mock":
         return MockLLMClient()
-    if s.llm_backend in ("anthropic", "openai", "local"):
-        raise NotImplementedError(f"{s.llm_backend} LLM 어댑터는 후속 (Sprint 2는 mock)")
+    if s.llm_backend == "anthropic":
+        return AnthropicLLMClient(model=s.llm_model)
+    if s.llm_backend in ("openai", "local"):
+        raise NotImplementedError(f"{s.llm_backend} LLM 어댑터는 미구현")
     raise ValueError(f"unknown LLM_BACKEND: {s.llm_backend}")

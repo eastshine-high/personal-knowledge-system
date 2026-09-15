@@ -212,11 +212,14 @@ def test_get_llm_client_mock_and_stubs():
             extract_backend="fixture", modal_endpoint_url="", modal_api_token="",
             render_dpi=200, request_timeout_s=5, crop_dir="/tmp", max_retries=0,
             retry_backoff_s=0, warmup=False, fixtures_dir="/tmp", llm_backend=backend,
+            llm_model="claude-sonnet-4-6",
         )
 
     assert isinstance(get_llm_client(_s("mock")), MockLLMClient)
+    from app.llm.client import AnthropicLLMClient
+    assert isinstance(get_llm_client(_s("anthropic")), AnthropicLLMClient)
     import pytest
-    for stub in ("anthropic", "openai", "local"):
+    for stub in ("openai", "local"):
         with pytest.raises(NotImplementedError):
             get_llm_client(_s(stub))
     with pytest.raises(ValueError):
