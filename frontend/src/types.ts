@@ -1,3 +1,47 @@
+// --- 서재 -------------------------------------------------------------------
+
+export interface PdfFile {
+  id: string;
+  book_id: string;
+  label: string;
+  pdf_path: string;
+  created_at: string;
+}
+
+export interface Book {
+  id: string;
+  title: string;
+  created_at: string;
+  pdf_files: PdfFile[];
+}
+
+// --- 자유 대화 ---------------------------------------------------------------
+
+export interface Conversation {
+  id: string;
+  book_id: string;
+  pdf_file_id: string;
+  pages: number[];
+  pages_display: string;
+  title: string | null;
+  created_at: string;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface ChatResponse {
+  conversation: Conversation;
+  message: Message;
+}
+
+// --- 노트 -------------------------------------------------------------------
+
 export interface FigureResponse {
   embed_name: string;
   caption: string;

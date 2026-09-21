@@ -1,4 +1,4 @@
-import type { NoteResponse, SessionResponse } from "./types";
+import type { Book, ChatResponse, Conversation, Message, NoteResponse, PdfFile, SessionResponse } from "./types";
 
 const BASE = "http://localhost:8000";
 
@@ -77,4 +77,53 @@ export function exportUrl(sessionId: string): string {
 /** <img src={figureUrl(...)} /> 방식으로 사용 — fetch 불필요. */
 export function figureUrl(sessionId: string, embedName: string): string {
   return `${BASE}/sessions/${sessionId}/figures/${embedName}`;
+}
+
+// --- 서재 -------------------------------------------------------------------
+
+export function getBooks(): Promise<Book[]> {
+  return request("/books");
+}
+
+export function createBook(title: string): Promise<Book> {
+  return request("/books", { method: "POST", body: JSON.stringify({ title }) });
+}
+
+export function addPdf(bookId: string, label: string, pdf_path: string): Promise<PdfFile> {
+  return request(`/books/${bookId}/pdfs`, {
+    method: "POST",
+    body: JSON.stringify({ label, pdf_path }),
+  });
+}
+
+export function deletePdf(bookId: string, pdfId: string): Promise<void> {
+  return request(`/books/${bookId}/pdfs/${pdfId}`, { method: "DELETE" });
+}
+
+// --- 자유 대화 ---------------------------------------------------------------
+
+export function getConversations(bookId: string): Promise<Conversation[]> {
+  return request(`/books/${bookId}/conversations`);
+}
+
+export function createConversation(
+  bookId: string,
+  pdf_file_id: string,
+  pages_str: string,
+): Promise<Conversation> {
+  return request(`/books/${bookId}/conversations`, {
+    method: "POST",
+    body: JSON.stringify({ pdf_file_id, pages_str }),
+  });
+}
+
+export function getMessages(convId: string): Promise<Message[]> {
+  return request(`/conversations/${convId}/messages`);
+}
+
+export function sendMessage(convId: string, content: string): Promise<ChatResponse> {
+  return request(`/conversations/${convId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
 }

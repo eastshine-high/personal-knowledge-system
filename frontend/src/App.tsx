@@ -1,149 +1,217 @@
-import { useEffect, useState } from "react";
-import type { NoteResponse, SessionResponse } from "./types";
+import { useState } from "react";
+import type { Book, Conversation, NoteResponse, PdfFile, SessionResponse } from "./types";
 import InputForm from "./components/InputForm";
 import PdfViewer from "./components/PdfViewer";
 import NotePanel from "./components/NotePanel";
 import RefineChat from "./components/RefineChat";
 import Toolbar from "./components/Toolbar";
+import LibraryPanel from "./components/LibraryPanel";
+import ConversationList from "./components/ConversationList";
+import NewChatForm from "./components/NewChatForm";
+import ChatPanel from "./components/ChatPanel";
+
+type MainView =
+  | { kind: "empty" }
+  | { kind: "conversation-list" }
+  | { kind: "new-chat" }
+  | { kind: "chat"; conv: Conversation }
+  | { kind: "note-session"; session: SessionResponse };
 
 export default function App() {
-  const [session, setSession] = useState<SessionResponse | null>(null);
+  const [selectedPdf, setSelectedPdf] = useState<{ pdf: PdfFile; book: Book } | null>(null);
+  const [mainView, setMainView] = useState<MainView>({ kind: "empty" });
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [newConv, setNewConv] = useState<Conversation | null>(null);
+  const [showNoteModal, setShowNoteModal] = useState(false);
 
-  // 새 세션이 생성될 때 첫 번째 노트 선택
-  useEffect(() => {
-    if (session) setSelectedNoteId(session.notes[0]?.id ?? null);
-  }, [session?.session_id]);
-
-  const handleNoteUpdated = (updated: NoteResponse) => {
-    setSession((prev) =>
-      prev
-        ? { ...prev, notes: prev.notes.map((n) => (n.id === updated.id ? updated : n)) }
-        : prev,
-    );
+  const handleSelectPdf = (pdf: PdfFile, book: Book) => {
+    setSelectedPdf({ pdf, book });
+    setMainView({ kind: "conversation-list" });
+    setNewConv(null);
   };
 
-  if (!session) {
-    return (
-      <main style={styles.center}>
-        <InputForm onSessionCreated={setSession} />
-      </main>
-    );
-  }
+  const handleConvCreated = (conv: Conversation) => {
+    setNewConv(conv);
+    setMainView({ kind: "chat", conv });
+  };
 
-  const currentNote =
-    session.notes.find((n) => n.id === selectedNoteId) ?? session.notes[0] ?? null;
-  const multiNote = session.notes.length > 1;
+  const handleSelectConv = (conv: Conversation) => {
+    setMainView({ kind: "chat", conv });
+  };
+
+  const handleNoteSessionCreated = (session: SessionResponse) => {
+    setSelectedNoteId(session.notes[0]?.id ?? null);
+    setMainView({ kind: "note-session", session });
+    setShowNoteModal(false);
+  };
+
+  const handleNoteUpdated = (updated: NoteResponse) => {
+    if (mainView.kind !== "note-session") return;
+    const session = mainView.session;
+    setMainView({
+      kind: "note-session",
+      session: { ...session, notes: session.notes.map((n) => n.id === updated.id ? updated : n) },
+    });
+  };
+
+  const handleSessionUpdated = (session: SessionResponse) => {
+    if (mainView.kind !== "note-session") return;
+    setMainView({ kind: "note-session", session });
+  };
 
   return (
-    <main style={styles.workspace}>
-      <section style={styles.left}>
-        <h2 style={styles.panelTitle}>소스 패널</h2>
-        <PdfViewer sessionId={session.session_id} pages={currentNote?.pages ?? []} />
-      </section>
-      <section style={styles.right}>
-        <div style={styles.panelHeader}>
-          <h2 style={styles.panelTitle}>작업 패널</h2>
-          <Toolbar sessionId={session.session_id} onSessionUpdated={setSession} />
+    <main style={s.workspace}>
+      {/* 좌측 서재 패널 */}
+      <aside style={s.sidebar}>
+        <LibraryPanel selectedPdfId={selectedPdf?.pdf.id ?? null} onSelectPdf={handleSelectPdf} />
+      </aside>
+
+      {/* 우측 메인 영역 */}
+      <section style={s.main}>
+        {/* 상단 바 */}
+        <div style={s.topBar}>
+          <span style={s.appTitle}>PKS</span>
+          <button style={s.noteBtn} onClick={() => setShowNoteModal(true)}>
+            노트 생성
+          </button>
         </div>
 
-        {multiNote && (
-          <div style={styles.tabBar} role="tablist">
-            {session.notes.map((note, idx) => (
-              <button
-                key={note.id}
-                role="tab"
-                aria-selected={note.id === currentNote?.id}
-                style={note.id === currentNote?.id ? styles.tabActive : styles.tab}
-                onClick={() => setSelectedNoteId(note.id)}
-              >
-                {note.title || `노트 ${idx + 1}`}
-              </button>
-            ))}
+        {/* 노트 생성 모달 */}
+        {showNoteModal && (
+          <div style={s.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) setShowNoteModal(false); }}>
+            <div style={s.modal}>
+              <InputForm onSessionCreated={handleNoteSessionCreated} />
+            </div>
           </div>
         )}
 
-        {currentNote && (
-          <NotePanel
-            sessionId={session.session_id}
-            note={currentNote}
-            onNoteUpdated={handleNoteUpdated}
-          />
-        )}
-        <RefineChat
-          sessionId={session.session_id}
-          events={session.events}
-          onSessionUpdated={setSession}
-        />
+        {/* 메인 콘텐츠 */}
+        <div style={s.content}>
+          {mainView.kind === "empty" && (
+            <div style={s.emptyState}>
+              <p style={s.emptyText}>서재에서 PDF를 선택하거나</p>
+              <p style={s.emptyText}>노트 생성 버튼을 눌러 시작하세요</p>
+            </div>
+          )}
+
+          {mainView.kind === "conversation-list" && selectedPdf && (
+            <ConversationList
+              book={selectedPdf.book}
+              pdf={selectedPdf.pdf}
+              selectedConvId={mainView.kind === "conversation-list" ? null : null}
+              onSelectConv={handleSelectConv}
+              onNewChat={() => setMainView({ kind: "new-chat" })}
+              newConv={newConv}
+            />
+          )}
+
+          {mainView.kind === "new-chat" && selectedPdf && (
+            <NewChatForm
+              book={selectedPdf.book}
+              pdf={selectedPdf.pdf}
+              onCreated={handleConvCreated}
+              onCancel={() => setMainView({ kind: "conversation-list" })}
+            />
+          )}
+
+          {mainView.kind === "chat" && (
+            <ChatPanel conversation={mainView.conv} />
+          )}
+
+          {mainView.kind === "note-session" && (() => {
+            const { session } = mainView;
+            const currentNote =
+              session.notes.find((n) => n.id === selectedNoteId) ?? session.notes[0] ?? null;
+            const multiNote = session.notes.length > 1;
+            return (
+              <div style={s.noteWorkspace}>
+                <section style={s.sourcePanel}>
+                  <h2 style={s.panelTitle}>소스 패널</h2>
+                  <PdfViewer sessionId={session.session_id} pages={currentNote?.pages ?? []} />
+                </section>
+                <section style={s.workPanel}>
+                  <div style={s.panelHeader}>
+                    <h2 style={s.panelTitle}>작업 패널</h2>
+                    <Toolbar sessionId={session.session_id} onSessionUpdated={handleSessionUpdated} />
+                  </div>
+                  {multiNote && (
+                    <div style={s.tabBar} role="tablist">
+                      {session.notes.map((note, idx) => (
+                        <button
+                          key={note.id}
+                          role="tab"
+                          aria-selected={note.id === currentNote?.id}
+                          style={note.id === currentNote?.id ? s.tabActive : s.tab}
+                          onClick={() => setSelectedNoteId(note.id)}
+                        >
+                          {note.title || `노트 ${idx + 1}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {currentNote && (
+                    <NotePanel
+                      sessionId={session.session_id}
+                      note={currentNote}
+                      onNoteUpdated={handleNoteUpdated}
+                    />
+                  )}
+                  <RefineChat
+                    sessionId={session.session_id}
+                    events={session.events}
+                    onSessionUpdated={handleSessionUpdated}
+                  />
+                </section>
+              </div>
+            );
+          })()}
+        </div>
       </section>
     </main>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  center: {
-    display: "flex",
-    height: "100vh",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#f5f5f5",
-    fontFamily: "sans-serif",
+const s: Record<string, React.CSSProperties> = {
+  workspace: { display: "flex", height: "100vh", fontFamily: "sans-serif", background: "#fafafa" },
+  sidebar: { width: 220, borderRight: "1px solid #e0e0e0", background: "#fff", flexShrink: 0 },
+  main: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
+  topBar: {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    padding: "10px 16px", borderBottom: "1px solid #e0e0e0", background: "#fff",
   },
-  workspace: {
-    display: "flex",
-    height: "100vh",
-    fontFamily: "sans-serif",
+  appTitle: { fontSize: 15, fontWeight: 700, color: "#1a1a1a" },
+  noteBtn: {
+    padding: "6px 14px", background: "#1a1a1a", color: "#fff",
+    border: "none", borderRadius: 4, fontSize: 13, cursor: "pointer",
   },
-  left: {
-    flex: 1,
-    borderRight: "1px solid #e0e0e0",
-    padding: 16,
-    overflowY: "auto",
+  content: { flex: 1, overflowY: "auto", padding: 20 },
+  emptyState: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 4 },
+  emptyText: { margin: 0, fontSize: 14, color: "#aaa" },
+  // 모달
+  modalOverlay: {
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
   },
-  right: {
-    flex: 1,
-    padding: 16,
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
+  modal: {
+    background: "#fff", borderRadius: 8, padding: 24, boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+    maxWidth: 520, width: "90%", maxHeight: "90vh", overflowY: "auto",
   },
+  // 노트 세션 2분할
+  noteWorkspace: { display: "flex", height: "100%", gap: 0 },
+  sourcePanel: { flex: 1, borderRight: "1px solid #e0e0e0", padding: 16, overflowY: "auto" },
+  workPanel: { flex: 1, padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 },
   panelHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   panelTitle: { margin: 0, fontSize: 16, fontWeight: 600 },
-  tabBar: {
-    display: "flex",
-    gap: 4,
-    borderBottom: "1px solid #e0e0e0",
-    paddingBottom: 0,
-  },
+  tabBar: { display: "flex", gap: 4, borderBottom: "1px solid #e0e0e0" },
   tab: {
-    padding: "6px 14px",
-    background: "none",
-    border: "1px solid #e0e0e0",
-    borderBottom: "none",
-    borderRadius: "4px 4px 0 0",
-    fontSize: 13,
-    cursor: "pointer",
-    color: "#666",
-    whiteSpace: "nowrap" as const,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    maxWidth: 160,
+    padding: "6px 14px", background: "none", border: "1px solid #e0e0e0",
+    borderBottom: "none", borderRadius: "4px 4px 0 0", fontSize: 13, cursor: "pointer",
+    color: "#666", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160,
   },
   tabActive: {
-    padding: "6px 14px",
-    background: "#fff",
-    border: "1px solid #e0e0e0",
-    borderBottom: "1px solid #fff",
-    borderRadius: "4px 4px 0 0",
-    fontSize: 13,
-    cursor: "pointer",
-    color: "#1a1a1a",
-    fontWeight: 600,
-    whiteSpace: "nowrap" as const,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    maxWidth: 160,
-    marginBottom: -1,
+    padding: "6px 14px", background: "#fff", border: "1px solid #e0e0e0",
+    borderBottom: "1px solid #fff", borderRadius: "4px 4px 0 0", fontSize: 13, cursor: "pointer",
+    color: "#1a1a1a", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden",
+    textOverflow: "ellipsis", maxWidth: 160, marginBottom: -1,
   },
 };
