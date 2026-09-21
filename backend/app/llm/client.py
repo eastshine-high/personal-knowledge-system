@@ -63,6 +63,9 @@ class MockLLMClient:
             body = _current_body(note) or note
             return f"TITLE: {title}\n\n{body}\n\n[리파인 반영: {instruction}]"
 
+        if task == "chat":
+            return f"[Mock 응답] {user[:80].strip()}"
+
         # summarize (기본)
         topic = _field(user, "TOPIC") or "요약"
         guideline = _field(user, "GUIDELINE")

@@ -1,9 +1,21 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api import router
+from .chat_router import router as chat_router
+from .db import init_db
+from .library_router import router as library_router
 
-app = FastAPI(title="PKS — PDF 개념 요약 노트 모듈")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="PKS — PDF 개념 요약 노트 모듈", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -13,6 +25,8 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(library_router)
+app.include_router(chat_router)
 
 
 @app.get("/health")
