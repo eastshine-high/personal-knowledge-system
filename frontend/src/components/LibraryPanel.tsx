@@ -64,7 +64,28 @@ export default function LibraryPanel({ selectedPdfId, onSelectPdf }: Props) {
 
   return (
     <div style={s.panel}>
-      <p style={s.heading}>서재</p>
+      <div style={s.headingRow}>
+        <p style={s.heading}>서재</p>
+        {!addingBook && (
+          <button style={s.addBookBtn} onClick={() => setAddingBook(true)}>+ 책 추가</button>
+        )}
+      </div>
+      {addingBook && (
+        <div style={s.inlineForm}>
+          <input
+            style={s.input}
+            placeholder="책 제목"
+            value={newBookTitle}
+            autoFocus
+            onChange={(e) => setNewBookTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitBook()}
+          />
+          <div style={s.formBtns}>
+            <button style={s.btnSm} onClick={submitBook}>추가</button>
+            <button style={s.btnSmGhost} onClick={() => setAddingBook(false)}>취소</button>
+          </div>
+        </div>
+      )}
       {error && <p style={s.error} onClick={() => setError(null)}>{error}</p>}
 
       <div style={s.bookList}>
@@ -125,31 +146,14 @@ export default function LibraryPanel({ selectedPdfId, onSelectPdf }: Props) {
         ))}
       </div>
 
-      {addingBook ? (
-        <div style={s.inlineForm}>
-          <input
-            style={s.input}
-            placeholder="책 제목"
-            value={newBookTitle}
-            autoFocus
-            onChange={(e) => setNewBookTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submitBook()}
-          />
-          <div style={s.formBtns}>
-            <button style={s.btnSm} onClick={submitBook}>추가</button>
-            <button style={s.btnSmGhost} onClick={() => setAddingBook(false)}>취소</button>
-          </div>
-        </div>
-      ) : (
-        <button style={s.addBookBtn} onClick={() => setAddingBook(true)}>+ 책 추가</button>
-      )}
     </div>
   );
 }
 
 const s: Record<string, React.CSSProperties> = {
   panel: { display: "flex", flexDirection: "column", height: "100%", padding: "12px 8px", gap: 4 },
-  heading: { margin: "0 0 8px", fontSize: 13, fontWeight: 700, color: "#333" },
+  headingRow: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+  heading: { margin: 0, fontSize: 13, fontWeight: 700, color: "#333" },
   error: { margin: 0, fontSize: 11, color: "#d32f2f", cursor: "pointer", padding: "4px 0" },
   bookList: { flex: 1, overflowY: "auto" as const },
   bookBtn: {
@@ -179,7 +183,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   addBookBtn: {
     background: "none", border: "1px dashed #ccc", borderRadius: 4,
-    color: "#666", fontSize: 12, cursor: "pointer", padding: "6px 8px", marginTop: 8,
+    color: "#666", fontSize: 11, cursor: "pointer", padding: "3px 8px",
   },
   inlineForm: { display: "flex", flexDirection: "column", gap: 4, padding: "4px 0" },
   input: { padding: "4px 8px", border: "1px solid #ccc", borderRadius: 4, fontSize: 12 },
