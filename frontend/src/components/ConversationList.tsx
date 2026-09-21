@@ -15,8 +15,10 @@ export default function ConversationList({ book, pdf, selectedConvId, onSelectCo
   const [convs, setConvs] = useState<Conversation[]>([]);
 
   useEffect(() => {
-    getConversations(book.id).catch(() => []).then(setConvs);
-  }, [book.id]);
+    getConversations(book.id)
+      .catch(() => [] as Conversation[])
+      .then(data => setConvs(data.filter(c => c.pdf_file_id === pdf.id)));
+  }, [book.id, pdf.id]);
 
   useEffect(() => {
     if (newConv) {

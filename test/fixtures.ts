@@ -1,3 +1,10 @@
+import type { Page } from "@playwright/test";
+
+/** 노트 생성 모달을 열기 위해 상단 바 버튼을 클릭한다. */
+export async function openNoteModal(page: Page): Promise<void> {
+  await page.getByTestId("open-note-modal-btn").click();
+}
+
 /** E1~E5 공통 mock 데이터 */
 
 export const SESSION_ID = "test-session-id";

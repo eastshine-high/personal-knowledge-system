@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { MOCK_NOTE, MOCK_SESSION, NOTE_ID, SESSION_ID, TINY_PNG } from "./fixtures";
+import { MOCK_NOTE, MOCK_SESSION, NOTE_ID, SESSION_ID, TINY_PNG, openNoteModal } from "./fixtures";
 
 test("E4 직접 편집: 편집 저장 → UI에 반영", async ({ page }) => {
   const EDITED_NOTE = { ...MOCK_NOTE, body: "직접 수정한 본문 내용입니다." };
@@ -16,11 +16,12 @@ test("E4 직접 편집: 편집 저장 → UI에 반영", async ({ page }) => {
   });
 
   await page.goto("/");
+  await openNoteModal(page);
   await page.getByPlaceholder("/path/to/document.pdf").fill("/path/to/test.pdf");
   await page.getByLabel("시작 페이지").fill("200");
   await page.getByLabel("끝 페이지").fill("200");
   await page.getByPlaceholder("예: 셀프 어텐션 메커니즘").fill("셀프 어텐션");
-  await page.getByRole("button", { name: "노트 생성" }).click();
+  await page.locator("form button[type='submit']").click();
 
   // 편집 모드 진입
   await page.getByRole("button", { name: "편집" }).click();

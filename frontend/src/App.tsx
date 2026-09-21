@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Book, Conversation, NoteResponse, PdfFile, SessionResponse } from "./types";
 import InputForm from "./components/InputForm";
 import PdfViewer from "./components/PdfViewer";
@@ -23,6 +23,15 @@ export default function App() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [newConv, setNewConv] = useState<Conversation | null>(null);
   const [showNoteModal, setShowNoteModal] = useState(false);
+
+  useEffect(() => {
+    if (!showNoteModal) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowNoteModal(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [showNoteModal]);
 
   const handleSelectPdf = (pdf: PdfFile, book: Book) => {
     setSelectedPdf({ pdf, book });
@@ -71,7 +80,7 @@ export default function App() {
         {/* 상단 바 */}
         <div style={s.topBar}>
           <span style={s.appTitle}>PKS</span>
-          <button style={s.noteBtn} onClick={() => setShowNoteModal(true)}>
+          <button data-testid="open-note-modal-btn" style={s.noteBtn} onClick={() => setShowNoteModal(true)}>
             노트 생성
           </button>
         </div>

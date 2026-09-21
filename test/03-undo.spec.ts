@@ -6,6 +6,7 @@ import {
   MOCK_SESSION_AFTER_UNDO,
   SESSION_ID,
   TINY_PNG,
+  openNoteModal,
 } from "./fixtures";
 
 test("E3 undo: refine 후 undo → 이전 노트 복원", async ({ page }) => {
@@ -24,11 +25,12 @@ test("E3 undo: refine 후 undo → 이전 노트 복원", async ({ page }) => {
   });
 
   await page.goto("/");
+  await openNoteModal(page);
   await page.getByPlaceholder("/path/to/document.pdf").fill("/path/to/test.pdf");
   await page.getByLabel("시작 페이지").fill("200");
   await page.getByLabel("끝 페이지").fill("200");
   await page.getByPlaceholder("예: 셀프 어텐션 메커니즘").fill("셀프 어텐션");
-  await page.getByRole("button", { name: "노트 생성" }).click();
+  await page.locator("form button[type='submit']").click();
 
   // refine
   await page.getByPlaceholder(/지시 입력/).fill("불릿으로 정리해줘");

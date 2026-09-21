@@ -22,6 +22,9 @@ def build_chat_messages(context_text: str, history: list[dict]) -> list[Message]
 
     system_content = f"{_SYSTEM}\n\n[CONTEXT]\n{context_text}"
     messages = [Message(role="system", content=system_content)]
-    for msg in trimmed:
-        messages.append(Message(role=msg["role"], content=msg["content"]))
+    for i, msg in enumerate(trimmed):
+        content = msg["content"]
+        if i == len(trimmed) - 1 and msg["role"] == "user":
+            content = f"{content}\n[TASK] chat"
+        messages.append(Message(role=msg["role"], content=content))
     return messages

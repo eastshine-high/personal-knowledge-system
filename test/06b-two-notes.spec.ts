@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { MOCK_SESSION_TWO_NOTES, SESSION_ID, TINY_PNG } from "./fixtures";
+import { MOCK_SESSION_TWO_NOTES, SESSION_ID, TINY_PNG, openNoteModal } from "./fixtures";
 
 test("E6b 노트 2개 탭 전환: 탭 바 표시 → 두 번째 탭 클릭 → 내용 전환", async ({ page }) => {
   await page.route("**/sessions", async (route) => {
@@ -11,11 +11,12 @@ test("E6b 노트 2개 탭 전환: 탭 바 표시 → 두 번째 탭 클릭 → �
   });
 
   await page.goto("/");
+  await openNoteModal(page);
   await page.getByPlaceholder("/path/to/document.pdf").fill("/path/to/test.pdf");
   await page.getByLabel("시작 페이지").fill("200");
   await page.getByLabel("끝 페이지").fill("201");
   await page.getByPlaceholder("예: 셀프 어텐션 메커니즘").fill("셀프 어텐션");
-  await page.getByRole("button", { name: "노트 생성" }).click();
+  await page.locator("form button[type='submit']").click();
 
   // 탭 바에 두 탭이 표시됨
   await expect(page.getByRole("tab", { name: "셀프 어텐션 메커니즘" })).toBeVisible();

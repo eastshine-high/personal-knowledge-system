@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { MOCK_SESSION, SESSION_ID, TINY_PNG } from "./fixtures";
+import { MOCK_SESSION, SESSION_ID, TINY_PNG, openNoteModal } from "./fixtures";
 
 test("E1 황금 경로: 폼 입력 → 노트 생성 → 패널 표시", async ({ page }) => {
   // --- mock ---
@@ -16,6 +16,7 @@ test("E1 황금 경로: 폼 입력 → 노트 생성 → 패널 표시", async (
 
   // --- 입력 폼 ---
   await page.goto("/");
+  await openNoteModal(page);
   await expect(page.getByText("PDF 개념 요약 노트")).toBeVisible();
 
   await page.getByPlaceholder("/path/to/document.pdf").fill("/path/to/test.pdf");
@@ -23,7 +24,7 @@ test("E1 황금 경로: 폼 입력 → 노트 생성 → 패널 표시", async (
   await page.getByLabel("끝 페이지").fill("200");
   await page.getByPlaceholder("예: 셀프 어텐션 메커니즘").fill("셀프 어텐션");
 
-  await page.getByRole("button", { name: "노트 생성" }).click();
+  await page.locator("form button[type='submit']").click();
 
   // --- 워크스페이스로 전환됐는지 ---
   await expect(page.getByText("작업 패널")).toBeVisible();

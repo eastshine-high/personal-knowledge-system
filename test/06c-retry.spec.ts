@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { MOCK_SESSION, SESSION_ID, TINY_PNG } from "./fixtures";
+import { MOCK_SESSION, SESSION_ID, TINY_PNG, openNoteModal } from "./fixtures";
 
 test("E6c 실패 재시도: 500 에러 후 폼 재시도 → 성공", async ({ page }) => {
   let callCount = 0;
@@ -21,18 +21,19 @@ test("E6c 실패 재시도: 500 에러 후 폼 재시도 → 성공", async ({ p
   });
 
   await page.goto("/");
+  await openNoteModal(page);
   await page.getByPlaceholder("/path/to/document.pdf").fill("/path/to/test.pdf");
   await page.getByLabel("시작 페이지").fill("200");
   await page.getByLabel("끝 페이지").fill("200");
   await page.getByPlaceholder("예: 셀프 어텐션 메커니즘").fill("셀프 어텐션");
 
   // 첫 시도 → 500 오류
-  await page.getByRole("button", { name: "노트 생성" }).click();
+  await page.locator("form button[type='submit']").click();
   await expect(page.getByText("서버 내부 오류")).toBeVisible();
-  await expect(page.getByRole("button", { name: "노트 생성" })).toBeVisible();
+  await expect(page.locator("form button[type='submit']")).toBeVisible();
 
   // 재시도 → 성공
-  await page.getByRole("button", { name: "노트 생성" }).click();
+  await page.locator("form button[type='submit']").click();
   await expect(page.getByText("작업 패널")).toBeVisible();
   await expect(page.getByText("셀프 어텐션 메커니즘")).toBeVisible();
 });
