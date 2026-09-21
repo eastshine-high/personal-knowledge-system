@@ -179,6 +179,20 @@ def export_session(session_id: str, background_tasks: BackgroundTasks) -> FileRe
     return FileResponse(tmp.name, media_type="application/zip", filename=f"{stem}-notes.zip")
 
 
+@router.get("/sessions/{session_id}/figures/{filename}")
+def get_figure(session_id: str, filename: str) -> FileResponse:
+    """figure 크롭 이미지를 반환한다. embed_name으로 노트에서 source_path를 역조회."""
+    session = _get_session(session_id)
+    for note in session.notes:
+        for fig in note.figures:
+            if fig.embed_name == filename:
+                src = Path(fig.source_path)
+                if not src.is_file():
+                    raise HTTPException(status_code=404, detail="크롭 파일 없음")
+                return FileResponse(str(src), media_type="image/png")
+    raise HTTPException(status_code=404, detail=f"그림 {filename} 없음")
+
+
 @router.post("/sessions/{session_id}/undo", response_model=SessionResponse)
 def undo_session(session_id: str) -> SessionResponse:
     """직전 변경을 되돌린다."""

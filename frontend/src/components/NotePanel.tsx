@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { editNote, ApiError } from "../api";
+import { editNote, figureUrl, ApiError } from "../api";
 import type { NoteResponse } from "../types";
 
 interface Props {
@@ -91,8 +91,12 @@ export default function NotePanel({ sessionId, note, onNoteUpdated }: Props) {
           <p style={styles.figuresLabel}>그림</p>
           {note.figures.map((fig) => (
             <div key={fig.embed_name} style={styles.figureItem}>
-              <code style={styles.embedName}>![[{fig.embed_name}]]</code>
-              {fig.caption && <span style={styles.caption}>{fig.caption}</span>}
+              <img
+                src={figureUrl(sessionId, fig.embed_name)}
+                alt={fig.caption || fig.embed_name}
+                style={styles.figureImg}
+              />
+              {fig.caption && <p style={styles.caption}>{fig.caption}</p>}
             </div>
           ))}
         </div>
@@ -142,9 +146,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   figures: { borderTop: "1px solid #eee", paddingTop: 8 },
   figuresLabel: { margin: "0 0 6px", fontSize: 12, color: "#888", fontWeight: 600 },
-  figureItem: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 },
-  embedName: { fontSize: 12, background: "#eee", padding: "2px 6px", borderRadius: 3 },
-  caption: { fontSize: 12, color: "#666" },
+  figureItem: { display: "flex", flexDirection: "column" as const, gap: 4, marginBottom: 12 },
+  figureImg: { maxWidth: "100%", borderRadius: 4, border: "1px solid #e8e8e8" },
+  caption: { margin: 0, fontSize: 12, color: "#666", fontStyle: "italic" },
   btnPrimary: {
     padding: "6px 14px",
     background: "#1a1a1a",

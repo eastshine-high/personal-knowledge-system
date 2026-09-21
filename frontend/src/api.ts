@@ -73,3 +73,8 @@ export function pageImageUrl(sessionId: string, pageNum: number): string {
 export function exportUrl(sessionId: string): string {
   return `${BASE}/sessions/${sessionId}/export`;
 }
+
+/** <img src={figureUrl(...)} /> 방식으로 사용 — fetch 불필요. */
+export function figureUrl(sessionId: string, embedName: string): string {
+  return `${BASE}/sessions/${sessionId}/figures/${embedName}`;
+}
