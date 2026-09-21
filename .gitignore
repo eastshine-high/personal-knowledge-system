@@ -42,3 +42,4 @@ backend/.crops/
 
 # spike 페이지 렌더(재생성 가능, 대용량)
 docs/spike-page*.png
+backend/pks.db
