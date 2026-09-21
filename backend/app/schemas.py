@@ -4,6 +4,66 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
+# --- 서재 -------------------------------------------------------------------
+
+class PdfFileResponse(BaseModel):
+    id: str
+    book_id: str
+    label: str
+    pdf_path: str
+    created_at: str
+
+
+class BookResponse(BaseModel):
+    id: str
+    title: str
+    created_at: str
+    pdf_files: list[PdfFileResponse] = []
+
+
+class BookCreate(BaseModel):
+    title: str
+
+
+class PdfFileCreate(BaseModel):
+    label: str
+    pdf_path: str
+
+
+# --- 자유 대화 ---------------------------------------------------------------
+
+class ConversationResponse(BaseModel):
+    id: str
+    book_id: str
+    pdf_file_id: str
+    pages: list[int]
+    pages_display: str      # "p.10-15, 21"
+    title: str | None
+    created_at: str
+
+
+class ConversationCreate(BaseModel):
+    pdf_file_id: str
+    pages_str: str          # "10-15, 21" 형식
+
+
+class MessageResponse(BaseModel):
+    id: str
+    conversation_id: str
+    role: str               # "user" | "assistant"
+    content: str
+    created_at: str
+
+
+class MessageCreate(BaseModel):
+    content: str
+
+
+class ChatResponse(BaseModel):
+    conversation: ConversationResponse
+    message: MessageResponse
+
+
 class FigureResponse(BaseModel):
     embed_name: str
     caption: str
