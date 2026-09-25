@@ -8,6 +8,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from .extractor import (
@@ -17,6 +18,23 @@ from .extractor import (
     LayoutExtractor,
     PageExtraction,
 )
+
+
+@dataclass
+class ExtractionTarget:
+    """get_or_extract 호출 파라미터 — 파일 ID·페이지 목록·PDF 경로."""
+
+    pdf_file_id: str
+    pages: list[int]
+    pdf_path: str
+
+
+@dataclass
+class PageCacheKey:
+    """캐시 저장 키 — (pdf_file_id, page_num)."""
+
+    pdf_file_id: str
+    page_num: int
 
 
 # --- 직렬화 / 역직렬화 -------------------------------------------------------
@@ -60,13 +78,12 @@ def _load_cached(
     return {row["page_num"]: _dict_to_page(json.loads(row["json"])) for row in rows}
 
 
-def _save_page(
-    db: sqlite3.Connection, pdf_file_id: str, page_num: int, pe: PageExtraction
-) -> None:
+def _save_page(db: sqlite3.Connection, key: PageCacheKey, pe: PageExtraction) -> None:
+    """캐시에 단일 페이지 추출 결과를 저장한다."""
     db.execute(
         "INSERT OR REPLACE INTO page_extractions (pdf_file_id, page_num, json, created_at) "
         "VALUES (?, ?, ?, ?)",
-        (pdf_file_id, page_num, json.dumps(_page_to_dict(pe)), datetime.now(timezone.utc).isoformat()),
+        (key.pdf_file_id, key.page_num, json.dumps(_page_to_dict(pe)), datetime.now(timezone.utc).isoformat()),
     )
     db.commit()
 
@@ -75,23 +92,21 @@ def _save_page(
 
 def get_or_extract(
     db: sqlite3.Connection,
-    pdf_file_id: str,
-    pages: list[int],
-    pdf_path: str,
+    target: ExtractionTarget,
     extractor: LayoutExtractor,
 ) -> list[PageExtraction]:
     """pages 순서대로 PageExtraction 반환. 캐시 미스 페이지만 extractor 호출."""
-    cached = _load_cached(db, pdf_file_id, pages)
+    cached = _load_cached(db, target.pdf_file_id, target.pages)
     result: dict[int, PageExtraction] = dict(cached)
 
-    missing = [p for p in pages if p not in cached]
+    missing = [p for p in target.pages if p not in cached]
     for page_num in missing:
-        extracted: ExtractionResult = extractor.extract(pdf_path, (page_num, page_num))
+        extracted: ExtractionResult = extractor.extract(target.pdf_path, (page_num, page_num))
         if extracted.pages:
             pe = extracted.pages[0]
         else:
             pe = PageExtraction(page=page_num)
-        _save_page(db, pdf_file_id, page_num, pe)
+        _save_page(db, PageCacheKey(target.pdf_file_id, page_num), pe)
         result[page_num] = pe
 
-    return [result[p] for p in pages if p in result]
+    return [result[p] for p in target.pages if p in result]

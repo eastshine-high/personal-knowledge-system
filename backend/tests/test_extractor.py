@@ -15,6 +15,7 @@ from app.extractors import (
     ModalLayoutExtractor,
     get_extractor,
 )
+from app.extractors.modal_extractor import ModalExtractorConfig
 
 
 # --- fixtures / helpers ---------------------------------------------------
@@ -39,10 +40,10 @@ def _raw(blocks, w=833, h=833):
 
 
 def _make_ext(raw, tmp_path):
-    ext = ModalLayoutExtractor(
-        "http://fake", "tok", render_dpi=200, timeout_s=5,
+    ext = ModalLayoutExtractor(ModalExtractorConfig(
+        endpoint_url="http://fake", api_token="tok", render_dpi=200, timeout_s=5,
         crop_dir=str(tmp_path / "crops"), warmup=False,
-    )
+    ))
     ext._call_endpoint = lambda img_bytes: raw  # GPU 호출 대체
     return ext
 
@@ -147,7 +148,7 @@ class _FakeResp:
 
 
 def _no_retry_ext():
-    return ModalLayoutExtractor("http://fake", "tok", max_retries=0, retry_backoff_s=0)
+    return ModalLayoutExtractor(ModalExtractorConfig(endpoint_url="http://fake", api_token="tok", max_retries=0, retry_backoff_s=0))
 
 
 def test_endpoint_non_200_raises(monkeypatch):
@@ -182,7 +183,7 @@ def test_retries_transient_500_then_succeeds(monkeypatch):
         return _FakeResp(200, payload={"meta": {}, "blocks": []})
 
     monkeypatch.setattr(modal_extractor.httpx, "post", flaky)
-    ext = ModalLayoutExtractor("http://fake", "tok", max_retries=2, retry_backoff_s=0)
+    ext = ModalLayoutExtractor(ModalExtractorConfig(endpoint_url="http://fake", api_token="tok", max_retries=2, retry_backoff_s=0))
     assert ext._call_endpoint(b"img") == {"meta": {}, "blocks": []}
     assert calls["n"] == 2  # 1회 실패 + 1회 성공
 
@@ -196,7 +197,7 @@ def test_retries_exhausted_raises(monkeypatch):
         return _FakeResp(500)
 
     monkeypatch.setattr(modal_extractor.httpx, "post", always_500)
-    ext = ModalLayoutExtractor("http://fake", "tok", max_retries=2, retry_backoff_s=0)
+    ext = ModalLayoutExtractor(ModalExtractorConfig(endpoint_url="http://fake", api_token="tok", max_retries=2, retry_backoff_s=0))
     with pytest.raises(ExtractionError):
         ext._call_endpoint(b"img")
     assert calls["n"] == 3  # 최초 1 + 재시도 2
@@ -212,7 +213,7 @@ def test_4xx_not_retried(monkeypatch):
         return _FakeResp(401, text="unauthorized")
 
     monkeypatch.setattr(modal_extractor.httpx, "post", unauthorized)
-    ext = ModalLayoutExtractor("http://fake", "tok", max_retries=2, retry_backoff_s=0)
+    ext = ModalLayoutExtractor(ModalExtractorConfig(endpoint_url="http://fake", api_token="tok", max_retries=2, retry_backoff_s=0))
     with pytest.raises(ExtractionError):
         ext._call_endpoint(b"img")
     assert calls["n"] == 1  # 재시도 없음
@@ -220,10 +221,10 @@ def test_4xx_not_retried(monkeypatch):
 
 def test_state_intact_after_failure(tiny_pdf, tmp_path):
     """실패 후에도 상태 손상 없이 재시도 가능(다음 호출 성공)."""
-    ext = ModalLayoutExtractor(
-        "http://fake", "tok", render_dpi=200, crop_dir=str(tmp_path / "c"),
+    ext = ModalLayoutExtractor(ModalExtractorConfig(
+        endpoint_url="http://fake", api_token="tok", render_dpi=200, crop_dir=str(tmp_path / "c"),
         max_retries=0, retry_backoff_s=0, warmup=False,
-    )
+    ))
 
     def fail(_img):
         raise ExtractionError("boom")
@@ -248,7 +249,7 @@ def test_invalid_page_range(tiny_pdf, tmp_path):
 
 def test_missing_endpoint_url_raises():
     with pytest.raises(ValueError):
-        ModalLayoutExtractor("", "tok")
+        ModalLayoutExtractor(ModalExtractorConfig(endpoint_url="", api_token="tok"))
 
 
 # --- 팩토리(스왑 지점) ----------------------------------------------------
@@ -282,10 +283,10 @@ def test_warmup_pings_health_before_extract(tiny_pdf, tmp_path, monkeypatch):
         return _FakeResp(200)
 
     monkeypatch.setattr(modal_extractor.httpx, "get", fake_get)
-    ext = ModalLayoutExtractor(
-        "http://fake", "tok", render_dpi=200, crop_dir=str(tmp_path / "c"),
+    ext = ModalLayoutExtractor(ModalExtractorConfig(
+        endpoint_url="http://fake", api_token="tok", render_dpi=200, crop_dir=str(tmp_path / "c"),
         warmup=True, retry_backoff_s=0,
-    )
+    ))
     ext._call_endpoint = lambda _img: _raw([])
     ext.extract(tiny_pdf, (1, 1))
     assert calls["health"] == 1  # 웜이면 즉시 200 → 1회

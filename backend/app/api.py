@@ -18,6 +18,7 @@ from .extractors import get_extractor
 from .llm import LLMClient, get_llm_client
 from .notes import EmptyTextError, NoteSession, build_session
 from .notes.models import Note
+from .notes.orchestrate import BuildSessionRequest
 from .schemas import (
     CreateSessionRequest,
     EditRequest,
@@ -83,13 +84,15 @@ def create_session(
     """PDF + 범위 + 주제 → 노트 세션 생성. session_id로 이후 조작."""
     try:
         session = build_session(
-            req.pdf_path,
-            (req.page_start, req.page_end),
-            topic=req.topic,
-            guideline=req.guideline,
-            note_count=req.note_count,
-            created=date.today().isoformat(),
-            user_preferred_guideline=req.user_preferred_guideline,
+            BuildSessionRequest(
+                pdf_path=req.pdf_path,
+                page_range=(req.page_start, req.page_end),
+                topic=req.topic,
+                guideline=req.guideline,
+                note_count=req.note_count,
+                created=date.today().isoformat(),
+                user_preferred_guideline=req.user_preferred_guideline,
+            ),
             extractor=extractor,
             client=client,
         )

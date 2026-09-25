@@ -7,9 +7,18 @@ from __future__ import annotations
 
 import re
 import zipfile
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .models import Note
+
+
+@dataclass
+class ZipState:
+    """zip 쓰기 중 추적 상태 — 파일명 중복·figure 이중 첨부 방지."""
+
+    used_md: set[str] = field(default_factory=set)
+    added_figs: set[str] = field(default_factory=set)
 
 
 def _safe_filename(name: str, fallback: str) -> str:
@@ -30,19 +39,17 @@ def _unique_md_filename(title: str, note_id: str, used: set[str]) -> str:
     return fname
 
 
-def _write_note_to_zip(
-    zf: zipfile.ZipFile, note: Note, used_md: set[str], added_figs: set[str]
-) -> None:
+def _write_note_to_zip(zf: zipfile.ZipFile, note: Note, state: ZipState) -> None:
     """노트 마크다운과 미첨부 figure 크롭을 zf에 추가."""
-    fname = _unique_md_filename(note.title, note.id, used_md)
+    fname = _unique_md_filename(note.title, note.id, state.used_md)
     zf.writestr(fname, note.to_markdown())
     for fig in note.figures:
-        if fig.embed_name in added_figs:
+        if fig.embed_name in state.added_figs:
             continue
         src = Path(fig.source_path)
         if src.is_file():
             zf.write(src, fig.embed_name)
-            added_figs.add(fig.embed_name)
+            state.added_figs.add(fig.embed_name)
 
 
 def export_notes(notes: list[Note], out_zip_path: str) -> str:
@@ -51,9 +58,8 @@ def export_notes(notes: list[Note], out_zip_path: str) -> str:
         raise ValueError("내보낼 노트 없음")
     out = Path(out_zip_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    used_md: set[str] = set()
-    added_figs: set[str] = set()
+    state = ZipState()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         for note in notes:
-            _write_note_to_zip(zf, note, used_md, added_figs)
+            _write_note_to_zip(zf, note, state)
     return str(out)

@@ -5,11 +5,26 @@
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from ..extractors import get_extractor
 from ..extractor import ExtractionResult, LayoutExtractor
 from ..llm import LLMClient, get_llm_client
 from .prepare import prepare_context
-from .session import NoteSession
+from .session import NoteSession, SessionConfig
+
+
+@dataclass
+class BuildSessionRequest:
+    """build_session 호출 파라미터 — PDF 경로·페이지 범위·주제·생성일·가이드라인."""
+
+    pdf_path: str
+    page_range: tuple[int, int]
+    topic: str
+    created: str
+    guideline: str | None = None
+    note_count: int = 1
+    user_preferred_guideline: str | None = None
 
 
 def _collect_highlights(result: ExtractionResult) -> list[str]:
@@ -25,34 +40,27 @@ def _collect_highlights(result: ExtractionResult) -> list[str]:
 
 
 def build_session(
-    pdf_path: str,
-    page_range: tuple[int, int],
+    req: BuildSessionRequest,
     *,
-    topic: str,
-    created: str,
-    guideline: str | None = None,
-    note_count: int = 1,
-    user_preferred_guideline: str | None = None,
     extractor: LayoutExtractor | None = None,
     client: LLMClient | None = None,
 ) -> NoteSession:
     """추출 → 준비 → NoteSession.start 까지 실행하고 세션을 반환한다."""
     extractor = extractor or get_extractor()
     client = client or get_llm_client()
-    result = extractor.extract(pdf_path, page_range)
+    result = extractor.extract(req.pdf_path, req.page_range)
     context = prepare_context(result)
     pages = [pe.page for pe in result.pages]
     highlights = _collect_highlights(result)
-    session = NoteSession(
-        client=client,
-        context=context,
+    config = SessionConfig(
         source=result.source,
         pages=pages,
-        topic=topic,
-        guideline=guideline,
-        created=created,
-        user_preferred_guideline=user_preferred_guideline,
+        topic=req.topic,
+        created=req.created,
+        guideline=req.guideline,
+        user_preferred_guideline=req.user_preferred_guideline,
         highlights=highlights or None,
     )
-    session.start(note_count=note_count)
+    session = NoteSession(client=client, context=context, config=config)
+    session.start(note_count=req.note_count)
     return session

@@ -9,10 +9,20 @@ import hashlib
 from dataclasses import dataclass, field
 
 
-def make_note_id(source: str, pages: list[int], topic: str, index: int = 0) -> str:
-    """source+pages+topic(+노트 index)로 안정적·결정적 노트 ID를 만든다."""
-    key = f"{source}|{','.join(str(p) for p in pages)}|{topic}|{index}"
-    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+@dataclass
+class NoteKey:
+    """노트 ID 생성에 쓰이는 식별 키 — source + pages + topic + (index)."""
+
+    source: str
+    pages: list[int]
+    topic: str
+    index: int = 0
+
+
+def make_note_id(key: NoteKey) -> str:
+    """NoteKey로 안정적·결정적 노트 ID를 만든다."""
+    raw = f"{key.source}|{','.join(str(p) for p in key.pages)}|{key.topic}|{key.index}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
 
 
 def _yaml_str(s: str) -> str:

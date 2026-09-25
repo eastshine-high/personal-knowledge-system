@@ -11,12 +11,16 @@ from app.notes import (
     NoteSession,
     PreparedContext,
     PreparedFigure,
+    BuildSessionRequest,
+    SessionConfig,
     build_session,
     make_note_id,
     prepare_context,
     refine,
     summarize,
 )
+from app.notes.models import NoteKey
+from app.notes.summarize import SummarizeRequest, RefineRequest
 
 
 class _BoomLLMClient:
@@ -63,8 +67,8 @@ def _pfig(source_path, caption, page=200):
 
 def _session(ctx, *, note_source="Building-AI-Agent.pdf", pages=None, topic="셀프 어텐션", guideline=None):
     return NoteSession(
-        client=MockLLMClient(), context=ctx, source=note_source,
-        pages=pages or [200], topic=topic, guideline=guideline, created="2026-08-31",
+        client=MockLLMClient(), context=ctx,
+        config=SessionConfig(source=note_source, pages=pages or [200], topic=topic, guideline=guideline, created="2026-08-31"),
     )
 
 
@@ -116,13 +120,13 @@ def test_frontmatter_escapes_quotes():
 
 
 def test_note_id_is_deterministic_and_distinct():
-    a = make_note_id("s.pdf", [42, 43], "topic")
-    b = make_note_id("s.pdf", [42, 43], "topic")
+    a = make_note_id(NoteKey("s.pdf", [42, 43], "topic"))
+    b = make_note_id(NoteKey("s.pdf", [42, 43], "topic"))
     assert a == b  # 같은 입력 → 같은 id
     # 노트 index가 다르면(분할) 다른 id
-    assert make_note_id("s.pdf", [42, 43], "topic", 0) != make_note_id("s.pdf", [42, 43], "topic", 1)
+    assert make_note_id(NoteKey("s.pdf", [42, 43], "topic", 0)) != make_note_id(NoteKey("s.pdf", [42, 43], "topic", 1))
     # 범위/주제가 다르면 다른 id
-    assert make_note_id("s.pdf", [42], "topic") != make_note_id("s.pdf", [43], "topic")
+    assert make_note_id(NoteKey("s.pdf", [42], "topic")) != make_note_id(NoteKey("s.pdf", [43], "topic"))
 
 
 def test_note_draft_shape():
@@ -228,8 +232,8 @@ def test_get_llm_client_mock_and_stubs():
 
 def test_summarize_reflects_topic_and_guideline():
     drafts = summarize(
-        MockLLMClient(), "쿼리 키 값으로 어텐션을 계산한다. 스케일드 닷프로덕트.",
-        topic="셀프 어텐션", guideline="수식 중심으로",
+        MockLLMClient(),
+        SummarizeRequest(text="쿼리 키 값으로 어텐션을 계산한다. 스케일드 닷프로덕트.", topic="셀프 어텐션", guideline="수식 중심으로"),
     )
     assert len(drafts) == 1
     d = drafts[0]
@@ -239,7 +243,7 @@ def test_summarize_reflects_topic_and_guideline():
 
 
 def test_summarize_multiple_notes():
-    drafts = summarize(MockLLMClient(), "본문 텍스트.", topic="주제", note_count=2)
+    drafts = summarize(MockLLMClient(), SummarizeRequest(text="본문 텍스트.", topic="주제", note_count=2))
     assert len(drafts) == 2
     # 관점(aspect)이 제목에 반영되어 서로 구분됨
     assert drafts[0].title != drafts[1].title
@@ -248,9 +252,7 @@ def test_summarize_multiple_notes():
 def test_refine_reflects_instruction():
     d = refine(
         MockLLMClient(),
-        'TITLE: 원본 제목\n\n원본 본문입니다.',
-        "더 짧게 요약해줘",
-        text="원문 텍스트.",
+        RefineRequest(note_markdown='TITLE: 원본 제목\n\n원본 본문입니다.', instruction="더 짧게 요약해줘", text="원문 텍스트."),
     )
     assert d.title == "원본 제목"                     # 기존 제목 유지
     assert "더 짧게 요약해줘" in d.body                # 지시 반영
@@ -397,7 +399,7 @@ def test_build_session_connects_extract_prepare_start():
     fake = _FakeExtractor(res)
 
     sess = build_session(
-        "x.pdf", (250, 251), topic="지식그래프", created="2026-09-02",
+        BuildSessionRequest(pdf_path="x.pdf", page_range=(250, 251), topic="지식그래프", created="2026-09-02"),
         extractor=fake, client=MockLLMClient(),
     )
     # 추출이 범위로 1회 호출됨
@@ -416,7 +418,7 @@ def test_build_session_connects_extract_prepare_start():
 def test_build_session_note_count():
     res = _result({1: [_blk("text", 100, "본문")]})
     sess = build_session(
-        "x.pdf", (1, 1), topic="t", created="2026-09-02", note_count=2,
+        BuildSessionRequest(pdf_path="x.pdf", page_range=(1, 1), topic="t", created="2026-09-02", note_count=2),
         extractor=_FakeExtractor(res), client=MockLLMClient(),
     )
     assert len(sess.notes) == 2
@@ -437,8 +439,10 @@ def test_build_session_empty_text_raises():
     # figure만 있고 텍스트 블록 없음
     res = _result({1: [_blk("figure", 100, "", ref="/c/f.png")]})
     with pytest.raises(EmptyTextError):
-        build_session("x.pdf", (1, 1), topic="t", created="2026-09-02",
-                      extractor=_FakeExtractor(res), client=MockLLMClient())
+        build_session(
+            BuildSessionRequest(pdf_path="x.pdf", page_range=(1, 1), topic="t", created="2026-09-02"),
+            extractor=_FakeExtractor(res), client=MockLLMClient(),
+        )
 
 
 def test_start_llm_error_propagates_and_state_intact():
@@ -520,8 +524,8 @@ def test_pii_no_image_path_reaches_llm():
     spy = _SpyLLMClient()
     ctx = _ctx(text="본문 텍스트", figures=[_pfig("/secret/crop/p1.png", "cap", page=1)])
     sess = NoteSession(
-        client=spy, context=ctx, source="s.pdf", pages=[1],
-        topic="t", guideline=None, created="2026-09-02",
+        client=spy, context=ctx,
+        config=SessionConfig(source="s.pdf", pages=[1], topic="t", guideline=None, created="2026-09-02"),
     )
     sess.start()
     sess.refine("다듬어")
@@ -546,7 +550,7 @@ def test_full_flow_build_refine_edit_export(tmp_path):
     res.source = "Building-AI-Agent.pdf"
 
     sess = build_session(
-        "x.pdf", (250, 251), topic="지식그래프", created="2026-09-02",
+        BuildSessionRequest(pdf_path="x.pdf", page_range=(250, 251), topic="지식그래프", created="2026-09-02"),
         extractor=_FakeExtractor(res), client=MockLLMClient(),
     )
     note = sess.notes[0]
@@ -576,8 +580,8 @@ def test_refine_injects_recent_instructions_as_context():
     """다중턴: 이전 refine 지시가 다음 refine의 LLM 맥락(HISTORY)에 주입."""
     spy = _SpyLLMClient()
     sess = NoteSession(
-        client=spy, context=_ctx(), source="s.pdf", pages=[1],
-        topic="t", guideline=None, created="2026-09-06",
+        client=spy, context=_ctx(),
+        config=SessionConfig(source="s.pdf", pages=[1], topic="t", guideline=None, created="2026-09-06"),
     )
     sess.start()
     sess.refine("첫 지시 A")
@@ -590,9 +594,8 @@ def test_refine_injects_recent_instructions_as_context():
 
 def test_start_falls_back_to_user_preferred_guideline():
     sess = NoteSession(
-        client=MockLLMClient(), context=_ctx(), source="s.pdf", pages=[1],
-        topic="t", guideline=None, created="2026-09-06",
-        user_preferred_guideline="수식 중심",
+        client=MockLLMClient(), context=_ctx(),
+        config=SessionConfig(source="s.pdf", pages=[1], topic="t", guideline=None, created="2026-09-06", user_preferred_guideline="수식 중심"),
     )
     note = sess.start()[0]
     assert "수식 중심" in note.body   # guideline 미지정이나 user: 취향 폴백
@@ -650,10 +653,13 @@ def test_undo_sequential_no_oscillation():
     assert sess.notes[0].body == start_body
 
 
-def test_temp_state_not_retained():
+def test_event_records_notes_snapshot():
+    """_record_event가 state["notes"]의 불변 스냅샷을 이벤트에 기록한다."""
     sess = _session(_ctx())
     sess.start()
-    sess._record_event("refine", "user", "x", extra_delta={"temp:scratch": 1, "topic": "새주제"})
-    assert "temp:scratch" not in sess.state       # temp: 는 영속 state 미잔류
-    assert sess.state["topic"] == "새주제"          # 일반 키는 반영
-    assert sess.events[-1].state_delta.get("temp:scratch") == 1  # 이벤트엔 기록(감사)
+    note_body_before = sess.notes[0].body
+    # 이벤트에 notes 스냅샷이 기록됨
+    assert sess.events[0].state_delta["notes"][0].body == note_body_before
+    # 이후 refine이 note를 변경해도 이벤트의 스냅샷은 변하지 않음(deepcopy)
+    sess.refine("변경")
+    assert sess.events[0].state_delta["notes"][0].body == note_body_before

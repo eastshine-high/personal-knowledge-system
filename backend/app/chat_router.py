@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json as _json
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -15,7 +16,7 @@ from .extractors import get_extractor
 from .llm import LLMClient, get_llm_client
 from .llm.chat_prompt import build_chat_messages
 from .notes.prepare import PreparedContext, prepare_context
-from .ocr_cache import get_or_extract
+from .ocr_cache import ExtractionTarget, get_or_extract
 from .pages import format_pages, parse_pages
 from .schemas import (
     ChatResponse,
@@ -28,6 +29,17 @@ from .schemas import (
 router = APIRouter(tags=["chat"])
 
 _HMARKER = "\n\n[HIGHLIGHTS_JSON]"
+
+
+@dataclass
+class ChatExchange:
+    """_persist_exchange 호출 파라미터 — 대화 ID·user/assistant 메시지·타임스탬프·제목 여부."""
+
+    conv_id: str
+    user_content: str
+    assistant_text: str
+    now: str
+    had_title: bool
 
 
 def _now() -> str:
@@ -125,19 +137,19 @@ def _load_history(db, conv_id: str) -> list[dict]:
     return [{"role": r["role"], "content": r["content"]} for r in rows]
 
 
-def _persist_exchange(db, conv_id: str, user_content: str, assistant_text: str, now: str, had_title: bool) -> str:
+def _persist_exchange(db, exchange: ChatExchange) -> str:
     """user + assistant 메시지 저장. 첫 메시지면 대화 제목도 설정. assistant message id 반환."""
     user_id, asst_id = str(uuid.uuid4()), str(uuid.uuid4())
     db.execute(
         "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
-        (user_id, conv_id, "user", user_content, now),
+        (user_id, exchange.conv_id, "user", exchange.user_content, exchange.now),
     )
     db.execute(
         "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
-        (asst_id, conv_id, "assistant", assistant_text, now),
+        (asst_id, exchange.conv_id, "assistant", exchange.assistant_text, exchange.now),
     )
-    if not had_title:
-        db.execute("UPDATE conversations SET title = ? WHERE id = ?", (user_content[:20].strip(), conv_id))
+    if not exchange.had_title:
+        db.execute("UPDATE conversations SET title = ? WHERE id = ?", (exchange.user_content[:20].strip(), exchange.conv_id))
     db.commit()
     return asst_id
 
@@ -166,7 +178,11 @@ def create_conversation(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    page_extractions = get_or_extract(db, req.pdf_file_id, pages, pdf_row["pdf_path"], extractor)
+    page_extractions = get_or_extract(
+        db,
+        ExtractionTarget(pdf_file_id=req.pdf_file_id, pages=pages, pdf_path=pdf_row["pdf_path"]),
+        extractor,
+    )
     context: PreparedContext = prepare_context(ExtractionResult(source=pdf_row["pdf_path"], pages=page_extractions))
     highlights = _collect_page_highlights(page_extractions, req.use_highlights)
 
@@ -218,7 +234,13 @@ def send_message(
     assistant_text = client.complete(messages)
 
     now = _now()
-    asst_id = _persist_exchange(db, conv_id, req.content, assistant_text, now, bool(conv_row["title"]))
+    asst_id = _persist_exchange(db, ChatExchange(
+        conv_id=conv_id,
+        user_content=req.content,
+        assistant_text=assistant_text,
+        now=now,
+        had_title=bool(conv_row["title"]),
+    ))
 
     pages = _json.loads(conv_row["pages_json"])
     conv_resp = ConversationResponse(

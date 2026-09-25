@@ -10,11 +10,13 @@ docs/adk-context-notes.md 참조.
 from __future__ import annotations
 
 import copy
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..llm import LLMClient
-from .models import Note, NoteFigure, SessionEvent, make_note_id
+from .models import Note, NoteFigure, NoteKey, SessionEvent, make_note_id
 from .prepare import PreparedContext
+from .summarize import RefineRequest, SummarizeRequest
 from .summarize import refine as _refine_draft
 from .summarize import summarize
 
@@ -23,47 +25,40 @@ class EmptyTextError(ValueError):
     """요약할 텍스트가 없음 (빈 노트 생성 방지)."""
 
 
-def _make_initial_state(
-    context: PreparedContext,
-    source: str,
-    pages: list[int],
-    topic: str,
-    guideline: str | None,
-    created: str,
-    highlights: list[str] | None,
-) -> dict:
+@dataclass
+class SessionConfig:
+    """NoteSession 초기화 파라미터 — source/topic/created/가이드라인/highlights."""
+
+    source: str
+    pages: list[int]
+    topic: str
+    created: str
+    guideline: str | None = None
+    user_preferred_guideline: str | None = None
+    highlights: list[str] | None = None
+
+
+def _make_initial_state(context: PreparedContext, config: SessionConfig) -> dict:
     """NoteSession 초기 state 딕셔너리 생성."""
     return {
         "source_text": context.text,
         "figures": context.figures,
-        "highlights": highlights or [],
-        "source": source,
-        "pages": pages,
-        "topic": topic,
-        "guideline": guideline,
-        "created": created,
+        "highlights": config.highlights or [],
+        "source": config.source,
+        "pages": config.pages,
+        "topic": config.topic,
+        "guideline": config.guideline,
+        "created": config.created,
         "notes": [],
     }
 
 
 class NoteSession:
-    def __init__(
-        self,
-        *,
-        client: LLMClient,
-        context: PreparedContext,
-        source: str,
-        pages: list[int],
-        topic: str,
-        guideline: str | None = None,
-        created: str,
-        user_preferred_guideline: str | None = None,
-        highlights: list[str] | None = None,
-    ) -> None:
+    def __init__(self, client: LLMClient, context: PreparedContext, config: SessionConfig) -> None:
         self.client = client
-        self.state = _make_initial_state(context, source, pages, topic, guideline, created, highlights)
-        if user_preferred_guideline is not None:
-            self.state["user:preferred_guideline"] = user_preferred_guideline
+        self.state = _make_initial_state(context, config)
+        if config.user_preferred_guideline is not None:
+            self.state["user:preferred_guideline"] = config.user_preferred_guideline
         self.events: list[SessionEvent] = []
         self._current_seq: int = -1
 
@@ -77,13 +72,15 @@ class NoteSession:
         text = self.state["source_text"]
         if not text.strip():
             raise EmptyTextError("요약할 텍스트 없음")
-        # guideline 미지정 시 사용자 취향(user: 스코프) 폴백
         guideline = self.state.get("guideline") or self.state.get("user:preferred_guideline")
-        highlights = self.state.get("highlights") or None
-        drafts = summarize(
-            self.client, text, topic=self.state["topic"], guideline=guideline,
-            note_count=note_count, highlights=highlights,
+        req = SummarizeRequest(
+            text=text,
+            topic=self.state["topic"],
+            guideline=guideline,
+            note_count=note_count,
+            highlights=self.state.get("highlights") or None,
         )
+        drafts = summarize(self.client, req)
         self.state["notes"] = [
             self._assemble_note(i, draft, attach_figures=(i == 0))
             for i, draft in enumerate(drafts)
@@ -103,13 +100,15 @@ class NoteSession:
             raise ValueError(f"note_id 없음: {note_id}")
         prior = self._recent_instructions()
         drafts = [
-            (note, _refine_draft(
-                self.client, f"TITLE: {note.title}\n\n{note.body}", instruction,
-                text=self.state["source_text"], history=prior,
-            ))
+            (note, _refine_draft(self.client, RefineRequest(
+                note_markdown=f"TITLE: {note.title}\n\n{note.body}",
+                instruction=instruction,
+                text=self.state["source_text"],
+                history=prior,
+            )))
             for note in targets
         ]
-        for note, draft in drafts:  # 전부 성공했을 때만 적용
+        for note, draft in drafts:
             note.title = draft.title
             note.body = draft.body
         self._record_event("refine", "user", instruction)
@@ -131,7 +130,6 @@ class NoteSession:
     def export(self, out_zip_path: str) -> str:
         """현재 노트[]와 첨부 그림을 zip 번들로 내보낸다."""
         from .export import export_notes
-
         return export_notes(self.notes, out_zip_path)
 
     # --- undo / 이력 복원 (event replay) --------------------------------
@@ -141,7 +139,7 @@ class NoteSession:
             raise ValueError(f"잘못된 seq: {seq}")
         self.state["notes"] = copy.deepcopy(self.events[seq].state_delta["notes"])
         self._record_event("revert", "user", f"seq {seq}로 복원")
-        self._current_seq = seq  # 복원된 시점의 seq가 현재 상태
+        self._current_seq = seq
         return self.notes
 
     def undo(self) -> list[Note]:
@@ -151,14 +149,9 @@ class NoteSession:
         return self.revert_to(self._current_seq - 1)
 
     # --- 내부 ----------------------------------------------------------
-    def _record_event(self, action: str, author: str, content: str, extra_delta: dict | None = None) -> None:
+    def _record_event(self, action: str, author: str, content: str) -> None:
         # state["notes"]는 이미 in-place 갱신됨. 이벤트엔 불변 스냅샷(deepcopy) 기록 → undo용.
         delta: dict = {"notes": copy.deepcopy(self.state["notes"])}
-        if extra_delta:
-            for key, value in extra_delta.items():
-                delta[key] = value
-                if not key.startswith("temp:"):   # temp: 는 영속 state에 남기지 않음
-                    self.state[key] = value
         self.events.append(
             SessionEvent(seq=len(self.events), author=author, action=action, content=content, state_delta=delta)
         )
@@ -170,7 +163,7 @@ class NoteSession:
     def _assemble_note(self, index: int, draft, attach_figures: bool) -> Note:
         # 그림 임베드는 body가 아니라 to_markdown()이 figures에서 렌더(refine/편집에도 유지).
         return Note(
-            id=make_note_id(self.state["source"], self.state["pages"], self.state["topic"], index),
+            id=make_note_id(NoteKey(self.state["source"], self.state["pages"], self.state["topic"], index)),
             title=draft.title,
             source=self.state["source"],
             pages=self.state["pages"],
@@ -187,11 +180,9 @@ class NoteSession:
         per_page: dict[int, int] = {}
         out: list[NoteFigure] = []
         for fig in self.state["figures"]:
-            if not fig.source_path:  # 크롭 실패한 그림은 첨부하지 않음
+            if not fig.source_path:
                 continue
             per_page[fig.page] = per_page.get(fig.page, 0) + 1
             embed = f"{stem}-p{fig.page}-fig{per_page[fig.page]}.png"
-            out.append(
-                NoteFigure(embed_name=embed, source_path=fig.source_path, caption=fig.caption)
-            )
+            out.append(NoteFigure(embed_name=embed, source_path=fig.source_path, caption=fig.caption))
         return out

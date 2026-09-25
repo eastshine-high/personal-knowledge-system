@@ -7,7 +7,7 @@ import pytest
 
 from app.db import init_db
 from app.extractor import Block, BBox, ExtractionResult, PageExtraction
-from app.ocr_cache import get_or_extract
+from app.ocr_cache import ExtractionTarget, get_or_extract
 
 
 @pytest.fixture
@@ -40,10 +40,14 @@ def _fake_extractor(call_log: list[int]):
     return _Ext()
 
 
+def _t(pdf_file_id, pages, pdf_path):
+    return ExtractionTarget(pdf_file_id=pdf_file_id, pages=pages, pdf_path=pdf_path)
+
+
 def test_cache_miss_calls_extractor(db):
     calls: list[int] = []
     ext = _fake_extractor(calls)
-    pages = get_or_extract(db, "pdf1", [1, 2], "test.pdf", ext)
+    pages = get_or_extract(db, _t("pdf1", [1, 2], "test.pdf"), ext)
     assert calls == [1, 2]
     assert len(pages) == 2
     assert pages[0].blocks[0].text == "page1"
@@ -53,10 +57,10 @@ def test_cache_hit_skips_extractor(db):
     calls: list[int] = []
     ext = _fake_extractor(calls)
     # 첫 번째 호출 — 캐시 저장
-    get_or_extract(db, "pdf1", [1], "test.pdf", ext)
+    get_or_extract(db, _t("pdf1", [1], "test.pdf"), ext)
     calls.clear()
     # 두 번째 호출 — 캐시 히트, extractor 미호출
-    pages = get_or_extract(db, "pdf1", [1], "test.pdf", ext)
+    pages = get_or_extract(db, _t("pdf1", [1], "test.pdf"), ext)
     assert calls == []
     assert pages[0].blocks[0].text == "page1"
 
@@ -65,10 +69,10 @@ def test_partial_cache(db):
     calls: list[int] = []
     ext = _fake_extractor(calls)
     # 페이지 1 먼저 캐시
-    get_or_extract(db, "pdf1", [1], "test.pdf", ext)
+    get_or_extract(db, _t("pdf1", [1], "test.pdf"), ext)
     calls.clear()
     # 페이지 1,2,3 요청 — 1은 캐시, 2,3만 추출
-    pages = get_or_extract(db, "pdf1", [1, 2, 3], "test.pdf", ext)
+    pages = get_or_extract(db, _t("pdf1", [1, 2, 3], "test.pdf"), ext)
     assert set(calls) == {2, 3}
     assert len(pages) == 3
 
@@ -77,7 +81,7 @@ def test_different_pdf_file_ids_isolated(db):
     """같은 page_num이라도 pdf_file_id가 다르면 별도 캐시."""
     calls: list[int] = []
     ext = _fake_extractor(calls)
-    get_or_extract(db, "pdf_A", [1], "a.pdf", ext)
+    get_or_extract(db, _t("pdf_A", [1], "a.pdf"), ext)
     calls.clear()
-    get_or_extract(db, "pdf_B", [1], "b.pdf", ext)
+    get_or_extract(db, _t("pdf_B", [1], "b.pdf"), ext)
     assert calls == [1]  # pdf_B는 캐시 없음

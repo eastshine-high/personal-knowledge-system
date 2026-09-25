@@ -9,53 +9,57 @@ PII: 페이지 이미지는 **우리 Modal 인스턴스**로만 전송(제3자 O
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass, field
 
 import httpx
 
 from ..config import Settings, get_settings
 from .base import BaseLayoutExtractor, ExtractionError
 
-__all__ = ["ModalLayoutExtractor", "ExtractionError"]
+__all__ = ["ModalLayoutExtractor", "ModalExtractorConfig", "ExtractionError"]
+
+
+@dataclass
+class ModalExtractorConfig:
+    """ModalLayoutExtractor 초기화 파라미터 — 엔드포인트·인증·성능 설정."""
+
+    endpoint_url: str
+    api_token: str
+    render_dpi: int = 200
+    timeout_s: float = 120.0
+    crop_dir: str = "backend/.crops"
+    max_retries: int = 2
+    retry_backoff_s: float = 2.0
+    warmup: bool = True
 
 
 class ModalLayoutExtractor(BaseLayoutExtractor):
     """서버리스 GPU(Modal) 엔드포인트 기반 LayoutExtractor 구현."""
 
-    def __init__(
-        self,
-        endpoint_url: str,
-        api_token: str,
-        *,
-        render_dpi: int = 200,
-        timeout_s: float = 120.0,
-        crop_dir: str = "backend/.crops",
-        max_retries: int = 2,
-        retry_backoff_s: float = 2.0,
-        warmup: bool = True,
-    ) -> None:
-        if not endpoint_url:
+    def __init__(self, config: ModalExtractorConfig) -> None:
+        if not config.endpoint_url:
             raise ValueError("endpoint_url이 비어 있음 (MODAL_ENDPOINT_URL 설정 필요)")
-        super().__init__(render_dpi=render_dpi, crop_dir=crop_dir)
-        self._url = endpoint_url.rstrip("/")
-        self._token = api_token
-        self._timeout = timeout_s
-        self._max_retries = max_retries
-        self._retry_backoff_s = retry_backoff_s
-        self._warmup = warmup
+        super().__init__(render_dpi=config.render_dpi, crop_dir=config.crop_dir)
+        self._url = config.endpoint_url.rstrip("/")
+        self._token = config.api_token
+        self._timeout = config.timeout_s
+        self._max_retries = config.max_retries
+        self._retry_backoff_s = config.retry_backoff_s
+        self._warmup = config.warmup
 
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> "ModalLayoutExtractor":
         s = settings or get_settings()
-        return cls(
-            s.modal_endpoint_url,
-            s.modal_api_token,
+        return cls(ModalExtractorConfig(
+            endpoint_url=s.modal_endpoint_url,
+            api_token=s.modal_api_token,
             render_dpi=s.render_dpi,
             timeout_s=s.request_timeout_s,
             crop_dir=s.crop_dir,
             max_retries=s.max_retries,
             retry_backoff_s=s.retry_backoff_s,
             warmup=s.warmup,
-        )
+        ))
 
     def _before_extract(self) -> None:
         if self._warmup:

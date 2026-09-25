@@ -8,6 +8,8 @@ LLM 출력 규약: 첫 줄 `TITLE: <제목>`, 빈 줄, 그다음 마크다운 �
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 from ..llm import LLMClient, Message
 from .models import NoteDraft
 
@@ -18,70 +20,70 @@ _SYSTEM = (
 )
 
 
-def _build_summarize_prompt(
-    text: str,
-    topic: str,
-    guideline: str | None,
-    aspect: str,
-    highlights: list[str] | None,
-) -> str:
+@dataclass
+class SummarizeRequest:
+    """요약 요청 파라미터 — 텍스트 + 주제/가이드라인/highlights."""
+
+    text: str
+    topic: str
+    guideline: str | None = None
+    note_count: int = 1
+    highlights: list[str] | None = None
+
+
+@dataclass
+class RefineRequest:
+    """리파인 요청 파라미터 — 현재 노트 + 지시 + 원문 + 이력."""
+
+    note_markdown: str
+    instruction: str
+    text: str
+    history: list[str] | None = None
+
+
+def _build_summarize_prompt(req: SummarizeRequest, aspect: str) -> str:
     """요약 프롬프트 조립 — highlights 있을 때만 [READER_FOCUS] 블록 포함."""
     lines = [
         "[TASK] summarize",
-        f"[TOPIC] {topic}",
-        f"[GUIDELINE] {guideline or ''}",
+        f"[TOPIC] {req.topic}",
+        f"[GUIDELINE] {req.guideline or ''}",
         f"[ASPECT] {aspect}",
         "[TEXT]",
-        text,
+        req.text,
     ]
-    if highlights:
+    if req.highlights:
         lines += [
             "",
             "[READER_FOCUS]",
             "다음은 독자가 이 페이지에서 중요하다고 표시한 구절입니다.",
             "요약은 이 독자의 이해 방식을 반영해야 합니다:",
         ]
-        lines += [f"- {h}" for h in highlights]
+        lines += [f"- {h}" for h in req.highlights]
     return "\n".join(lines)
 
 
-def summarize(
-    client: LLMClient,
-    text: str,
-    *,
-    topic: str,
-    guideline: str | None = None,
-    note_count: int = 1,
-    highlights: list[str] | None = None,
-) -> list[NoteDraft]:
+def summarize(client: LLMClient, req: SummarizeRequest) -> list[NoteDraft]:
     """추출 텍스트를 topic/guideline에 맞춰 note_count개 노트 초안으로 요약."""
     drafts: list[NoteDraft] = []
-    for i in range(1, note_count + 1):
-        prompt = _build_summarize_prompt(text, topic, guideline, f"{i}/{note_count}", highlights)
+    for i in range(1, req.note_count + 1):
+        prompt = _build_summarize_prompt(req, f"{i}/{req.note_count}")
         out = client.complete([Message("system", _SYSTEM), Message("user", prompt)])
         drafts.append(_parse_draft(out))
     return drafts
 
 
-def refine(
-    client: LLMClient,
-    note_markdown: str,
-    instruction: str,
-    *,
-    text: str,
-    history: list[str] | None = None,
-) -> NoteDraft:
+def refine(client: LLMClient, req: RefineRequest) -> NoteDraft:
     """현재 노트를 후속 지시로 다듬는다. 원문 텍스트 + 최근 지시(history)를 맥락으로 전달(다중턴)."""
     lines = ["[TASK] refine"]
-    if history:
+    if req.history:
         lines.append("[HISTORY]")
-        lines += [f"- {h}" for h in history]
+        lines += [f"- {h}" for h in req.history]
     lines += [
-        f"[INSTRUCTION] {instruction}",
+        f"[INSTRUCTION] {req.instruction}",
         "[NOTE]",
-        note_markdown,
+        req.note_markdown,
         "[SOURCE]",
-        text,
+        req.text,
     ]
     out = client.complete([Message("system", _SYSTEM), Message("user", "\n".join(lines))])
     return _parse_draft(out)

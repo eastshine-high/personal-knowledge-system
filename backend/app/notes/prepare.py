@@ -36,25 +36,32 @@ class PreparedContext:
     figures: list[PreparedFigure] = field(default_factory=list)
 
 
-def _nearest_caption(
-    fig: Block, captions: list[Block], used: set[int], threshold_px: float
-) -> str:
-    """figure에 세로로 가장 가까운(대개 바로 아래) 미사용 캡션을 반환. 임계값 초과면 ""."""
+@dataclass
+class CaptionMatcher:
+    """figure-caption 매핑 컨텍스트 — 후보 목록 + 사용 추적 + 거리 임계값."""
+
+    captions: list[Block]
+    used: set[int] = field(default_factory=set)  # id(Block) 집합, in-place 변경
+    threshold_px: float = 250.0
+
+
+def _nearest_caption(fig: Block, matcher: CaptionMatcher) -> str:
+    """figure에 세로로 가장 가까운 미사용 캡션을 반환. 임계값 초과면 ""."""
     best: Block | None = None
     best_d: float | None = None
-    for c in captions:
-        if id(c) in used:
+    for c in matcher.captions:
+        if id(c) in matcher.used:
             continue
-        if c.bbox.y0 >= fig.bbox.y1:        # 캡션이 그림 아래
+        if c.bbox.y0 >= fig.bbox.y1:
             d = c.bbox.y0 - fig.bbox.y1
-        elif c.bbox.y1 <= fig.bbox.y0:      # 캡션이 그림 위
+        elif c.bbox.y1 <= fig.bbox.y0:
             d = fig.bbox.y0 - c.bbox.y1
-        else:                                # 세로로 겹침
+        else:
             d = 0.0
         if best_d is None or d < best_d:
             best, best_d = c, d
-    if best is not None and best_d is not None and best_d <= threshold_px:
-        used.add(id(best))
+    if best is not None and best_d is not None and best_d <= matcher.threshold_px:
+        matcher.used.add(id(best))
         return best.text.strip()
     return ""
 
@@ -76,16 +83,19 @@ def _iter_content(
     threshold_px: float,
 ) -> tuple[list[str], list[PreparedFigure]]:
     """ordered 블록을 순회해 텍스트 조각과 figure 목록을 수집."""
-    used_captions: set[int] = set()
+    shared_used: set[int] = set()
     text_parts: list[str] = []
     figures: list[PreparedFigure] = []
     for page, b in ordered:
         if b.type in CONTENT_TYPES and b.text.strip():
             text_parts.append(b.text.strip())
         elif b.type == "figure":
-            caption = _nearest_caption(
-                b, captions_by_page.get(page, []), used_captions, threshold_px
+            matcher = CaptionMatcher(
+                captions=captions_by_page.get(page, []),
+                used=shared_used,
+                threshold_px=threshold_px,
             )
+            caption = _nearest_caption(b, matcher)
             figures.append(PreparedFigure(
                 source_path=b.image_ref or "",
                 caption=caption,
