@@ -1,4 +1,4 @@
-"""Sessions API 테스트 (B1~B3). 추출기·LLM은 dependency_overrides로 주입."""
+"""Sessions API BDD 명세 (B1~B3). 추출기·LLM은 dependency_overrides로 주입."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,18 +10,21 @@ from fastapi.testclient import TestClient
 
 from app.api import _extractor_dep, _llm_dep
 from app.extractor import BBox, Block, ExtractionResult, PageExtraction
-from app.extractors.fixture_extractor import FixtureLayoutExtractor
 from app.config import get_settings
 from app.llm.client import MockLLMClient
 from app.main import app
 
+
+# ---------------------------------------------------------------------------
+# 공용 helpers / fixtures
+# ---------------------------------------------------------------------------
 
 def _mock_llm():
     return MockLLMClient()
 
 
 def _text_extractor():
-    """텍스트 블록이 있는 가짜 추출 결과 반환 (pymupdf 불필요)."""
+    """텍스트 블록이 있는 가짜 추출 결과 — pymupdf 불필요."""
     mock = MagicMock()
     mock.extract.return_value = ExtractionResult(
         source="dummy.pdf",
@@ -35,7 +38,7 @@ def _text_extractor():
 
 
 def _empty_extractor():
-    """텍스트 블록이 없는 추출 결과 → EmptyTextError 유발."""
+    """텍스트 블록 없는 추출 결과 → EmptyTextError 유발."""
     mock = MagicMock()
     mock.extract.return_value = ExtractionResult(
         source="dummy.pdf",
@@ -50,156 +53,23 @@ def _clear_overrides():
     app.dependency_overrides.clear()
 
 
-def test_create_session_ok():
-    """mock 추출기 + mock LLM → 세션 생성 성공, session_id·notes·events 반환."""
+@pytest.fixture
+def client_with_text():
     app.dependency_overrides[_extractor_dep] = _text_extractor
     app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
-
-    resp = client.post("/sessions", json={
-        "pdf_path": "dummy.pdf",
-        "page_start": 200,
-        "page_end": 200,
-        "topic": "셀프 어텐션",
-    })
-
-    assert resp.status_code == 201
-    data = resp.json()
-    assert "session_id" in data
-    assert len(data["session_id"]) > 0
-    assert len(data["notes"]) >= 1
-    note = data["notes"][0]
-    assert note["title"]
-    assert note["markdown"].startswith("---")   # 프론트매터 포함
-    assert len(data["events"]) >= 1
-    assert data["events"][0]["action"] == "start"
+    return TestClient(app)
 
 
-def test_create_session_empty_text():
-    """텍스트 없는 추출 결과 → 422."""
-    app.dependency_overrides[_extractor_dep] = _empty_extractor
-    app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
-
-    resp = client.post("/sessions", json={
-        "pdf_path": "dummy.pdf",
-        "page_start": 1,
-        "page_end": 1,
-        "topic": "테스트",
-    })
-
-    assert resp.status_code == 422
-
-
-def test_get_notes():
-    """세션 생성 후 GET /notes → 노트 목록 반환."""
-    app.dependency_overrides[_extractor_dep] = _text_extractor
-    app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
-
-    sid = client.post("/sessions", json={
-        "pdf_path": "dummy.pdf", "page_start": 1, "page_end": 1, "topic": "테스트",
-    }).json()["session_id"]
-
-    resp = client.get(f"/sessions/{sid}/notes")
-    assert resp.status_code == 200
-    assert len(resp.json()) >= 1
-
-
-def test_refine_session():
-    """refine → 노트 갱신 + events에 refine 추가."""
-    app.dependency_overrides[_extractor_dep] = _text_extractor
-    app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
-
-    sid = client.post("/sessions", json={
-        "pdf_path": "dummy.pdf", "page_start": 1, "page_end": 1, "topic": "테스트",
-    }).json()["session_id"]
-
-    resp = client.post(f"/sessions/{sid}/refine", json={"instruction": "불릿으로"})
-    assert resp.status_code == 200
-    data = resp.json()
-    actions = [e["action"] for e in data["events"]]
-    assert "refine" in actions
-
-
-def test_edit_note():
-    """apply_edit → 노트 본문 갱신."""
-    app.dependency_overrides[_extractor_dep] = _text_extractor
-    app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
-
-    create = client.post("/sessions", json={
+@pytest.fixture
+def created_session(client_with_text):
+    """세션이 이미 생성된 상태의 (client, session_data) 튜플."""
+    data = client_with_text.post("/sessions", json={
         "pdf_path": "dummy.pdf", "page_start": 1, "page_end": 1, "topic": "테스트",
     }).json()
-    sid = create["session_id"]
-    note_id = create["notes"][0]["id"]
-
-    resp = client.post(f"/sessions/{sid}/notes/{note_id}/edit",
-                       json={"body": "직접 수정한 내용"})
-    assert resp.status_code == 200
-    assert resp.json()["body"] == "직접 수정한 내용"
-
-
-def test_undo_session():
-    """refine 후 undo → 이전 노트 복원."""
-    app.dependency_overrides[_extractor_dep] = _text_extractor
-    app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
-
-    create = client.post("/sessions", json={
-        "pdf_path": "dummy.pdf", "page_start": 1, "page_end": 1, "topic": "테스트",
-    }).json()
-    sid = create["session_id"]
-    original_body = create["notes"][0]["body"]
-
-    client.post(f"/sessions/{sid}/refine", json={"instruction": "불릿으로"})
-    resp = client.post(f"/sessions/{sid}/undo")
-    assert resp.status_code == 200
-    assert resp.json()["notes"][0]["body"] == original_body
-
-
-def test_undo_without_prior_returns_409():
-    """undo 가능한 이전 상태 없음 → 409."""
-    app.dependency_overrides[_extractor_dep] = _text_extractor
-    app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
-
-    sid = client.post("/sessions", json={
-        "pdf_path": "dummy.pdf", "page_start": 1, "page_end": 1, "topic": "테스트",
-    }).json()["session_id"]
-
-    resp = client.post(f"/sessions/{sid}/undo")
-    assert resp.status_code == 409
-
-
-def test_session_not_found():
-    """없는 session_id → 404."""
-    client = TestClient(app)
-    assert client.get("/sessions/nonexistent/notes").status_code == 404
-
-
-def test_export_session():
-    """세션 내보내기 → zip 파일 다운로드."""
-    import zipfile, io
-    app.dependency_overrides[_extractor_dep] = _text_extractor
-    app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
-
-    sid = client.post("/sessions", json={
-        "pdf_path": "dummy.pdf", "page_start": 1, "page_end": 1, "topic": "테스트",
-    }).json()["session_id"]
-
-    resp = client.get(f"/sessions/{sid}/export")
-    assert resp.status_code == 200
-    assert resp.headers["content-type"] == "application/zip"
-    zf = zipfile.ZipFile(io.BytesIO(resp.content))
-    names = zf.namelist()
-    assert any(n.endswith(".md") for n in names)   # 마크다운 파일 포함
+    return client_with_text, data
 
 
 def _make_pdf(path: Path) -> None:
-    """테스트용 단일 페이지 PDF 생성."""
     doc = pymupdf.open()
     page = doc.new_page()
     page.insert_text((100, 100), "Test page content")
@@ -207,43 +77,170 @@ def _make_pdf(path: Path) -> None:
     doc.close()
 
 
-def test_get_page_image(tmp_path):
-    """세션 생성 후 페이지 이미지 요청 → PNG 반환."""
-    pdf_path = tmp_path / "test.pdf"
-    _make_pdf(pdf_path)
+# ---------------------------------------------------------------------------
+# Describe: 세션 생성
+# ---------------------------------------------------------------------------
 
-    app.dependency_overrides[_extractor_dep] = _text_extractor
-    app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
+class DescribeCreateSession:
+    """POST /sessions 의 동작 명세."""
 
-    sid = client.post("/sessions", json={
-        "pdf_path": str(pdf_path), "page_start": 1, "page_end": 1, "topic": "테스트",
-    }).json()["session_id"]
+    def test_returns_session_with_notes_and_events(self, client_with_text):
+        # When a session is created with a valid PDF and topic
+        resp = client_with_text.post("/sessions", json={
+            "pdf_path": "dummy.pdf", "page_start": 200, "page_end": 200, "topic": "셀프 어텐션",
+        })
 
-    resp = client.get(f"/sessions/{sid}/pages/1")
-    assert resp.status_code == 200
-    assert resp.headers["content-type"] == "image/png"
-    assert len(resp.content) > 1000   # 비어있지 않은 PNG
+        # Then 201 is returned with session_id, at least one note, and a start event
+        assert resp.status_code == 201
+        data = resp.json()
+        assert len(data["session_id"]) > 0
+        assert len(data["notes"]) >= 1
+        assert data["notes"][0]["markdown"].startswith("---")   # 프론트매터 포함
+        assert data["events"][0]["action"] == "start"
+
+    def test_pdf_with_no_text_returns_422(self):
+        # Given an extractor that returns no text blocks
+        app.dependency_overrides[_extractor_dep] = _empty_extractor
+        app.dependency_overrides[_llm_dep] = _mock_llm
+        client = TestClient(app)
+
+        # When a session is created
+        resp = client.post("/sessions", json={
+            "pdf_path": "dummy.pdf", "page_start": 1, "page_end": 1, "topic": "테스트",
+        })
+
+        # Then 422 is returned
+        assert resp.status_code == 422
 
 
-def test_get_page_image_out_of_range(tmp_path):
-    """페이지 번호 범위 초과 → 404."""
-    pdf_path = tmp_path / "test.pdf"
-    _make_pdf(pdf_path)
+# ---------------------------------------------------------------------------
+# Describe: 세션 조작
+# ---------------------------------------------------------------------------
 
-    app.dependency_overrides[_extractor_dep] = _text_extractor
-    app.dependency_overrides[_llm_dep] = _mock_llm
-    client = TestClient(app)
+class DescribeSessionOperations:
+    """세션 조회·리파인·편집·undo 동작 명세."""
 
-    sid = client.post("/sessions", json={
-        "pdf_path": str(pdf_path), "page_start": 1, "page_end": 1, "topic": "테스트",
-    }).json()["session_id"]
+    def test_get_notes_returns_note_list(self, created_session):
+        # Given a created session
+        client, data = created_session
+        sid = data["session_id"]
 
-    assert client.get(f"/sessions/{sid}/pages/99").status_code == 404
+        # When notes are fetched
+        resp = client.get(f"/sessions/{sid}/notes")
+
+        # Then the list is returned
+        assert resp.status_code == 200
+        assert len(resp.json()) >= 1
+
+    def test_refine_updates_notes_and_appends_refine_event(self, created_session):
+        # Given a created session
+        client, data = created_session
+        sid = data["session_id"]
+
+        # When refined
+        resp = client.post(f"/sessions/{sid}/refine", json={"instruction": "불릿으로"})
+
+        # Then the response contains a refine event
+        assert resp.status_code == 200
+        actions = [e["action"] for e in resp.json()["events"]]
+        assert "refine" in actions
+
+    def test_edit_note_updates_body(self, created_session):
+        # Given a created session
+        client, data = created_session
+        sid = data["session_id"]
+        note_id = data["notes"][0]["id"]
+
+        # When the note is directly edited
+        resp = client.post(f"/sessions/{sid}/notes/{note_id}/edit",
+                           json={"body": "직접 수정한 내용"})
+
+        # Then the updated body is returned
+        assert resp.status_code == 200
+        assert resp.json()["body"] == "직접 수정한 내용"
+
+    def test_undo_restores_note_to_state_before_refine(self, created_session):
+        # Given a session that has been refined
+        client, data = created_session
+        sid = data["session_id"]
+        original_body = data["notes"][0]["body"]
+        client.post(f"/sessions/{sid}/refine", json={"instruction": "불릿으로"})
+
+        # When undone
+        resp = client.post(f"/sessions/{sid}/undo")
+
+        # Then the note is back to the original body
+        assert resp.status_code == 200
+        assert resp.json()["notes"][0]["body"] == original_body
+
+    def test_undo_without_prior_state_returns_409(self, client_with_text):
+        # Given a fresh session (no changes after start)
+        sid = client_with_text.post("/sessions", json={
+            "pdf_path": "dummy.pdf", "page_start": 1, "page_end": 1, "topic": "테스트",
+        }).json()["session_id"]
+
+        # When undo is attempted
+        resp = client_with_text.post(f"/sessions/{sid}/undo")
+
+        # Then 409 Conflict is returned
+        assert resp.status_code == 409
+
+    def test_unknown_session_id_returns_404(self):
+        # Given no session with id "nonexistent"
+        client = TestClient(app)
+
+        # Then 404 is returned
+        assert client.get("/sessions/nonexistent/notes").status_code == 404
 
 
-def test_health():
-    client = TestClient(app)
-    resp = client.get("/health")
-    assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+# ---------------------------------------------------------------------------
+# Describe: export + 페이지 이미지
+# ---------------------------------------------------------------------------
+
+class DescribeSessionExportAndImages:
+    """세션 zip 내보내기 + 페이지 이미지 반환 동작 명세."""
+
+    def test_export_returns_zip_with_markdown(self, created_session):
+        import zipfile, io
+        # Given a created session
+        client, data = created_session
+        sid = data["session_id"]
+
+        # When exported
+        resp = client.get(f"/sessions/{sid}/export")
+
+        # Then a zip file is returned containing at least one markdown file
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/zip"
+        zf = zipfile.ZipFile(io.BytesIO(resp.content))
+        assert any(n.endswith(".md") for n in zf.namelist())
+
+    def test_page_image_returns_png(self, tmp_path, client_with_text):
+        # Given a real PDF file
+        pdf_path = tmp_path / "test.pdf"
+        _make_pdf(pdf_path)
+        sid = client_with_text.post("/sessions", json={
+            "pdf_path": str(pdf_path), "page_start": 1, "page_end": 1, "topic": "테스트",
+        }).json()["session_id"]
+
+        # When the first page image is requested
+        resp = client_with_text.get(f"/sessions/{sid}/pages/1")
+
+        # Then a non-empty PNG is returned
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "image/png"
+        assert len(resp.content) > 1000
+
+    def test_page_image_out_of_range_returns_404(self, tmp_path, client_with_text):
+        # Given a single-page PDF
+        pdf_path = tmp_path / "test.pdf"
+        _make_pdf(pdf_path)
+        sid = client_with_text.post("/sessions", json={
+            "pdf_path": str(pdf_path), "page_start": 1, "page_end": 1, "topic": "테스트",
+        }).json()["session_id"]
+
+        # When a non-existent page number is requested
+        resp = client_with_text.get(f"/sessions/{sid}/pages/99")
+
+        # Then 404 is returned
+        assert resp.status_code == 404

@@ -1,4 +1,4 @@
-"""T4 — 자유 대화 API 단위 테스트."""
+"""자유 대화 API BDD 명세."""
 from __future__ import annotations
 
 import app.db as db_mod
@@ -6,7 +6,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.extractor import ExtractionResult, PageExtraction, Block, BBox
-from app.extractors import get_extractor
 from app.llm import get_llm_client
 from app.config import get_settings
 
@@ -40,9 +39,7 @@ def client():
     from app.chat_router import _extractor_dep, _llm_dep
     app.dependency_overrides[_extractor_dep] = lambda: _StubExtractor()
     app.dependency_overrides[_llm_dep] = lambda: get_llm_client(
-        get_settings().__class__(
-            **{**get_settings().__dict__, "llm_backend": "mock"}
-        )
+        get_settings().__class__(**{**get_settings().__dict__, "llm_backend": "mock"})
     )
     with TestClient(app) as c:
         yield c
@@ -50,53 +47,72 @@ def client():
 
 
 @pytest.fixture
-def book_and_pdf(client, tmp_path):
+def conversation(client, tmp_path):
+    """책 + PDF + 대화가 생성된 상태."""
     book = client.post("/books", json={"title": "테스트북"}).json()
     pdf = tmp_path / "test.pdf"
     pdf.write_bytes(b"%PDF-1.4")
     pf = client.post(f"/books/{book['id']}/pdfs",
                      json={"label": "ch1", "pdf_path": str(pdf)}).json()
-    return book, pf
-
-
-def test_create_conversation(client, book_and_pdf):
-    book, pf = book_and_pdf
-    r = client.post(f"/books/{book['id']}/conversations",
-                    json={"pdf_file_id": pf["id"], "pages_str": "1-2"})
-    assert r.status_code == 201
-    conv = r.json()
-    assert conv["pages"] == [1, 2]
-    assert conv["pages_display"] == "p.1-2"
-
-
-def test_send_message_returns_assistant(client, book_and_pdf):
-    book, pf = book_and_pdf
     conv = client.post(f"/books/{book['id']}/conversations",
-                       json={"pdf_file_id": pf["id"], "pages_str": "1"}).json()
-    r = client.post(f"/conversations/{conv['id']}/messages",
-                    json={"content": "셀프어텐션이란?"})
-    assert r.status_code == 200
-    resp = r.json()
-    assert resp["message"]["role"] == "assistant"
-    assert resp["message"]["content"]
+                       json={"pdf_file_id": pf["id"], "pages_str": "1-2"}).json()
+    return client, book, pf, conv
 
 
-def test_messages_history(client, book_and_pdf):
-    book, pf = book_and_pdf
-    conv = client.post(f"/books/{book['id']}/conversations",
-                       json={"pdf_file_id": pf["id"], "pages_str": "1"}).json()
-    client.post(f"/conversations/{conv['id']}/messages", json={"content": "질문1"})
-    client.post(f"/conversations/{conv['id']}/messages", json={"content": "질문2"})
+class DescribeCreateConversation:
+    """POST /books/{id}/conversations 의 동작 명세."""
 
-    r = client.get(f"/conversations/{conv['id']}/messages")
-    msgs = r.json()
-    assert len(msgs) == 4  # user1, asst1, user2, asst2
-    assert msgs[0]["role"] == "user"
-    assert msgs[1]["role"] == "assistant"
+    def test_creates_conversation_with_parsed_pages(self, conversation):
+        # Given a book with a PDF
+        _, _, _, conv = conversation
+
+        # Then the conversation has correct pages and display format
+        assert conv["pages"] == [1, 2]
+        assert conv["pages_display"] == "p.1-2"
 
 
-def test_invalid_pages_str(client, book_and_pdf):
-    book, pf = book_and_pdf
-    r = client.post(f"/books/{book['id']}/conversations",
-                    json={"pdf_file_id": pf["id"], "pages_str": "10-5"})
-    assert r.status_code == 422
+class DescribeSendMessage:
+    """POST /conversations/{id}/messages 의 동작 명세."""
+
+    def test_returns_assistant_response(self, conversation):
+        # Given an existing conversation
+        client, _, _, conv = conversation
+
+        # When a message is sent
+        r = client.post(f"/conversations/{conv['id']}/messages",
+                        json={"content": "셀프어텐션이란?"})
+
+        # Then an assistant message is returned
+        assert r.status_code == 200
+        resp = r.json()
+        assert resp["message"]["role"] == "assistant"
+        assert resp["message"]["content"]
+
+    def test_messages_are_accumulated_in_history(self, conversation):
+        # Given two messages have been sent
+        client, _, _, conv = conversation
+        client.post(f"/conversations/{conv['id']}/messages", json={"content": "질문1"})
+        client.post(f"/conversations/{conv['id']}/messages", json={"content": "질문2"})
+
+        # When history is fetched
+        msgs = client.get(f"/conversations/{conv['id']}/messages").json()
+
+        # Then all 4 messages are in order: user1, asst1, user2, asst2
+        assert len(msgs) == 4
+        assert msgs[0]["role"] == "user"
+        assert msgs[1]["role"] == "assistant"
+
+    def test_invalid_pages_str_returns_422(self, client, tmp_path):
+        # Given a reversed range
+        book = client.post("/books", json={"title": "테스트북"}).json()
+        pdf = tmp_path / "test.pdf"
+        pdf.write_bytes(b"%PDF-1.4")
+        pf = client.post(f"/books/{book['id']}/pdfs",
+                         json={"label": "ch1", "pdf_path": str(pdf)}).json()
+
+        # When a conversation is created with an invalid page range
+        r = client.post(f"/books/{book['id']}/conversations",
+                        json={"pdf_file_id": pf["id"], "pages_str": "10-5"})
+
+        # Then 422 is returned
+        assert r.status_code == 422

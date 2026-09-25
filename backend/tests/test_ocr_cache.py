@@ -1,4 +1,4 @@
-"""T2 — OCR 캐시 단위 테스트."""
+"""OCR 캐시 BDD 명세."""
 from __future__ import annotations
 
 import sqlite3
@@ -12,11 +12,10 @@ from app.ocr_cache import ExtractionTarget, get_or_extract
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):
-    """인메모리가 아닌 tmp_path DB — init_db로 스키마 생성."""
+    """격리된 SQLite DB — init_db로 스키마 생성."""
     import app.db as db_mod
     db_path = tmp_path / "test.db"
     monkeypatch.setattr(db_mod, "_DB_PATH", db_path)
-    # thread-local 초기화 리셋
     if hasattr(db_mod._local, "conn"):
         db_mod._local.conn.close()
         del db_mod._local.conn
@@ -40,48 +39,64 @@ def _fake_extractor(call_log: list[int]):
     return _Ext()
 
 
-def _t(pdf_file_id, pages, pdf_path):
+def _target(pdf_file_id, pages, pdf_path="test.pdf"):
     return ExtractionTarget(pdf_file_id=pdf_file_id, pages=pages, pdf_path=pdf_path)
 
 
-def test_cache_miss_calls_extractor(db):
-    calls: list[int] = []
-    ext = _fake_extractor(calls)
-    pages = get_or_extract(db, _t("pdf1", [1, 2], "test.pdf"), ext)
-    assert calls == [1, 2]
-    assert len(pages) == 2
-    assert pages[0].blocks[0].text == "page1"
+class DescribeOcrCacheLayer:
+    """get_or_extract 캐시 레이어의 동작 명세."""
 
+    def test_cache_miss_calls_extractor_for_all_pages(self, db):
+        # Given no cached pages
+        calls: list[int] = []
+        ext = _fake_extractor(calls)
 
-def test_cache_hit_skips_extractor(db):
-    calls: list[int] = []
-    ext = _fake_extractor(calls)
-    # 첫 번째 호출 — 캐시 저장
-    get_or_extract(db, _t("pdf1", [1], "test.pdf"), ext)
-    calls.clear()
-    # 두 번째 호출 — 캐시 히트, extractor 미호출
-    pages = get_or_extract(db, _t("pdf1", [1], "test.pdf"), ext)
-    assert calls == []
-    assert pages[0].blocks[0].text == "page1"
+        # When pages 1 and 2 are requested
+        pages = get_or_extract(db, _target("pdf1", [1, 2]), ext)
 
+        # Then the extractor was called for both pages and results are returned
+        assert calls == [1, 2]
+        assert len(pages) == 2
+        assert pages[0].blocks[0].text == "page1"
 
-def test_partial_cache(db):
-    calls: list[int] = []
-    ext = _fake_extractor(calls)
-    # 페이지 1 먼저 캐시
-    get_or_extract(db, _t("pdf1", [1], "test.pdf"), ext)
-    calls.clear()
-    # 페이지 1,2,3 요청 — 1은 캐시, 2,3만 추출
-    pages = get_or_extract(db, _t("pdf1", [1, 2, 3], "test.pdf"), ext)
-    assert set(calls) == {2, 3}
-    assert len(pages) == 3
+    def test_cache_hit_skips_extractor(self, db):
+        # Given page 1 is already cached
+        calls: list[int] = []
+        ext = _fake_extractor(calls)
+        get_or_extract(db, _target("pdf1", [1]), ext)
+        calls.clear()
 
+        # When page 1 is requested again
+        pages = get_or_extract(db, _target("pdf1", [1]), ext)
 
-def test_different_pdf_file_ids_isolated(db):
-    """같은 page_num이라도 pdf_file_id가 다르면 별도 캐시."""
-    calls: list[int] = []
-    ext = _fake_extractor(calls)
-    get_or_extract(db, _t("pdf_A", [1], "a.pdf"), ext)
-    calls.clear()
-    get_or_extract(db, _t("pdf_B", [1], "b.pdf"), ext)
-    assert calls == [1]  # pdf_B는 캐시 없음
+        # Then the extractor is not called and cached data is returned
+        assert calls == []
+        assert pages[0].blocks[0].text == "page1"
+
+    def test_partial_cache_only_extracts_missing_pages(self, db):
+        # Given page 1 is already cached
+        calls: list[int] = []
+        ext = _fake_extractor(calls)
+        get_or_extract(db, _target("pdf1", [1]), ext)
+        calls.clear()
+
+        # When pages 1, 2, 3 are requested
+        pages = get_or_extract(db, _target("pdf1", [1, 2, 3]), ext)
+
+        # Then only pages 2 and 3 are extracted, and all 3 are returned
+        assert set(calls) == {2, 3}
+        assert len(pages) == 3
+
+    def test_different_pdf_file_ids_are_isolated(self, db):
+        """같은 page_num이라도 pdf_file_id가 다르면 별도 캐시를 사용한다."""
+        # Given page 1 of pdf_A is cached
+        calls: list[int] = []
+        ext = _fake_extractor(calls)
+        get_or_extract(db, _target("pdf_A", [1], "a.pdf"), ext)
+        calls.clear()
+
+        # When page 1 of a different pdf_B is requested
+        get_or_extract(db, _target("pdf_B", [1], "b.pdf"), ext)
+
+        # Then the extractor is called (pdf_B has no cache entry)
+        assert calls == [1]
