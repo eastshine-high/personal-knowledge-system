@@ -81,7 +81,49 @@ class BaseLayoutExtractor:
                     image_ref=image_ref,
                 )
             )
+        pe.highlights = self._extract_highlights(page, pe.blocks)
         return pe
+
+    def _extract_highlights(self, page: "pymupdf.Page", blocks: "list[Block]") -> "list[str]":
+        """PDF 형광 표시(highlight) 주석에서 텍스트를 수집한다.
+
+        1차: 페이지 텍스트 레이어에서 추출 (대부분의 GoodNotes PDF)
+        폴백: annotation rect를 render 픽셀로 변환해 OCR 블록과 매핑 (스캔 전용 PDF)
+        """
+        results: list[str] = []
+        for annot in page.annots() or []:
+            if annot.type[0] != pymupdf.PDF_ANNOT_HIGHLIGHT:
+                continue
+            text = page.get_textbox(annot.rect).strip()
+            if not text:
+                sx = self._dpi / 72.0
+                r = annot.rect
+                px_rect = pymupdf.Rect(r.x0 * sx, r.y0 * sx, r.x1 * sx, r.y1 * sx)
+                text = self._blocks_in_rect(px_rect, blocks)
+            if text:
+                results.append(text)
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for t in results:
+            if t not in seen:
+                seen.add(t)
+                deduped.append(t)
+        return deduped
+
+    def _blocks_in_rect(self, rect: "pymupdf.Rect", blocks: "list[Block]") -> str:
+        """annotation bbox(render 픽셀)와 50% 이상 겹치는 텍스트 블록을 이어붙여 반환."""
+        texts: list[str] = []
+        for b in blocks:
+            if not b.text:
+                continue
+            bx = pymupdf.Rect(b.bbox.x0, b.bbox.y0, b.bbox.x1, b.bbox.y1)
+            inter = bx & rect
+            if inter.is_empty:
+                continue
+            block_area = bx.get_area()
+            if block_area > 0 and inter.get_area() / block_area >= 0.5:
+                texts.append(b.text.strip())
+        return " ".join(texts)
 
     def _crop_figure(self, page: "pymupdf.Page", page_no: int, bbox: BBox) -> str | None:
         """figure 영역을 페이지에서 clip-render(픽셀→포인트)해 crop_dir에 저장, 파일 경로 반환."""

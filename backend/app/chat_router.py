@@ -116,11 +116,23 @@ def create_conversation(
         "VALUES (?, ?, ?, ?, ?, ?)",
         (conv_id, book_id, req.pdf_file_id, _json.dumps(pages), None, now),
     )
-    # context_text를 system 메시지로 저장해 이후 대화에서 재사용
+    # highlights 수집 (페이지 전체, 중복 제거, 읽기 순서 보존)
+    _seen_h: set[str] = set()
+    all_highlights: list[str] = []
+    for pe in page_extractions:
+        for h in pe.highlights:
+            if h not in _seen_h:
+                _seen_h.add(h)
+                all_highlights.append(h)
+
+    # context_text (+ highlights) 를 system 메시지로 저장해 이후 대화에서 재사용
+    sys_content = context.text
+    if all_highlights:
+        sys_content += "\n\n[HIGHLIGHTS_JSON]" + _json.dumps(all_highlights, ensure_ascii=False)
     sys_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
-        (sys_id, conv_id, "system", context.text, now),
+        (sys_id, conv_id, "system", sys_content, now),
     )
     db.commit()
 
@@ -162,7 +174,19 @@ def send_message(
         "SELECT content FROM messages WHERE conversation_id = ? AND role = 'system' LIMIT 1",
         (conv_id,),
     ).fetchone()
-    context_text = sys_row["content"] if sys_row else ""
+    raw_sys = sys_row["content"] if sys_row else ""
+    _HMARKER = "\n\n[HIGHLIGHTS_JSON]"
+    if _HMARKER in raw_sys:
+        _parts = raw_sys.split(_HMARKER, 1)
+        context_text = _parts[0]
+        try:
+            import json as _json2
+            highlights: list[str] = _json2.loads(_parts[1])
+        except (ValueError, IndexError):
+            highlights = []
+    else:
+        context_text = raw_sys
+        highlights = []
 
     # 기존 user/assistant 히스토리
     history_rows = db.execute(
@@ -173,7 +197,7 @@ def send_message(
     history = [{"role": r["role"], "content": r["content"]} for r in history_rows]
     history.append({"role": "user", "content": req.content})
 
-    messages = build_chat_messages(context_text, history)
+    messages = build_chat_messages(context_text, history, highlights or None)
     assistant_text = client.complete(messages)
 
     now = _now()

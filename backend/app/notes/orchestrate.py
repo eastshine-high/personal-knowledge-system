@@ -32,6 +32,14 @@ def build_session(
     context = prepare_context(result)
     pages = [pe.page for pe in result.pages]  # 실제 추출된 페이지들
 
+    seen_h: set[str] = set()
+    all_highlights: list[str] = []
+    for pe in result.pages:
+        for h in pe.highlights:
+            if h not in seen_h:
+                seen_h.add(h)
+                all_highlights.append(h)
+
     session = NoteSession(
         client=client,
         context=context,
@@ -41,6 +49,7 @@ def build_session(
         guideline=guideline,
         created=created,
         user_preferred_guideline=user_preferred_guideline,
+        highlights=all_highlights or None,
     )
     session.start(note_count=note_count)
     return session

@@ -42,6 +42,7 @@ def _dict_to_page(d: dict) -> PageExtraction:
         height_px=d["height_px"],
         render_dpi=d["render_dpi"],
         blocks=blocks,
+        highlights=d.get("highlights", []),
     )
 
 

@@ -95,6 +95,7 @@ class PageExtraction:
     height_px: int = 0       # 렌더된 페이지 이미지 높이(px)
     render_dpi: int = 200    # bbox 좌표를 만든 렌더 DPI (스파이크 기준 200)
     blocks: list[Block] = field(default_factory=list)
+    highlights: list[str] = field(default_factory=list)  # 독자 형광 표시 텍스트 (읽기 순서, 중복 제거)
 
 
 @dataclass

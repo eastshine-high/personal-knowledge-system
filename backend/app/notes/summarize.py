@@ -25,20 +25,28 @@ def summarize(
     topic: str,
     guideline: str | None = None,
     note_count: int = 1,
+    highlights: list[str] | None = None,
 ) -> list[NoteDraft]:
     """추출 텍스트를 topic/guideline에 맞춰 note_count개 노트 초안으로 요약."""
     drafts: list[NoteDraft] = []
     for i in range(1, note_count + 1):
-        user = "\n".join(
-            [
-                "[TASK] summarize",
-                f"[TOPIC] {topic}",
-                f"[GUIDELINE] {guideline or ''}",
-                f"[ASPECT] {i}/{note_count}",
-                "[TEXT]",
-                text,
+        lines = [
+            "[TASK] summarize",
+            f"[TOPIC] {topic}",
+            f"[GUIDELINE] {guideline or ''}",
+            f"[ASPECT] {i}/{note_count}",
+            "[TEXT]",
+            text,
+        ]
+        if highlights:
+            lines += [
+                "",
+                "[READER_FOCUS]",
+                "다음은 독자가 이 페이지에서 중요하다고 표시한 구절입니다.",
+                "요약은 이 독자의 이해 방식을 반영해야 합니다:",
             ]
-        )
+            lines += [f"- {h}" for h in highlights]
+        user = "\n".join(lines)
         out = client.complete([Message("system", _SYSTEM), Message("user", user)])
         drafts.append(_parse_draft(out))
     return drafts

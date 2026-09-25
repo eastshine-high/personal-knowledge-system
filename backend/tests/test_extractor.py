@@ -343,3 +343,62 @@ def test_fixture_extractor_missing_page_raises(tiny_pdf, tmp_path):
     ext = FixtureLayoutExtractor(str(tmp_path / "fixtures"), crop_dir=str(tmp_path / "crops"))
     with pytest.raises(ExtractionError):
         ext.extract(tiny_pdf, (1, 1))  # page1.json 없음
+
+
+# --- 형광 표시(highlight) 추출 ------------------------------------------------
+
+@pytest.fixture
+def highlighted_pdf(tmp_path):
+    """텍스트 레이어 + 형광 표시 1개가 있는 PDF."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=300, height=300)
+    page.insert_text((10, 50), "Important concept here", fontsize=12)
+    annot = page.add_highlight_annot(pymupdf.Rect(8, 38, 200, 62))
+    annot.update()
+    p = tmp_path / "highlighted.pdf"
+    doc.save(str(p))
+    doc.close()
+    return str(p)
+
+
+@pytest.fixture
+def no_text_highlighted_pdf(tmp_path):
+    """텍스트 레이어 없는 PDF + 형광 표시 (OCR 폴백 테스트용)."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=300, height=300)
+    annot = page.add_highlight_annot(pymupdf.Rect(8, 38, 200, 62))
+    annot.update()
+    p = tmp_path / "no_text_highlighted.pdf"
+    doc.save(str(p))
+    doc.close()
+    return str(p)
+
+
+def test_highlight_with_text_layer(highlighted_pdf, tmp_path):
+    """형광 표시 영역의 텍스트 레이어에서 텍스트를 추출한다."""
+    ext = _make_ext(_raw([]), tmp_path)
+    res = ext.extract(highlighted_pdf, (1, 1))
+    assert len(res.pages[0].highlights) == 1
+    assert "Important" in res.pages[0].highlights[0]
+
+
+def test_no_annotation_no_highlights(tiny_pdf, tmp_path):
+    """형광 표시 없는 PDF → highlights 빈 리스트."""
+    ext = _make_ext(_raw([]), tmp_path)
+    res = ext.extract(tiny_pdf, (1, 1))
+    assert res.pages[0].highlights == []
+
+
+def test_highlight_ocr_fallback(no_text_highlighted_pdf, tmp_path):
+    """텍스트 레이어 없을 때 OCR 블록으로 폴백한다."""
+    # Annotation rect: Rect(8, 38, 200, 62) in PDF points
+    # render_dpi=200 → scale = 200/72; pixel bbox ≈ [22, 105, 556, 172]
+    sx = 200 / 72
+    raw = _raw([{
+        "order": 1, "id": 0, "label": "text",
+        "bbox": [round(8 * sx), round(38 * sx), round(200 * sx), round(62 * sx)],
+        "content": "OCR 폴백 텍스트",
+    }])
+    ext = _make_ext(raw, tmp_path)
+    res = ext.extract(no_text_highlighted_pdf, (1, 1))
+    assert res.pages[0].highlights == ["OCR 폴백 텍스트"]

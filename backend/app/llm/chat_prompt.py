@@ -11,16 +11,25 @@ _SYSTEM = (
 )
 
 
-def build_chat_messages(context_text: str, history: list[dict]) -> list[Message]:
+def build_chat_messages(
+    context_text: str,
+    history: list[dict],
+    highlights: list[str] | None = None,
+) -> list[Message]:
     """LLMClient.complete()에 넘길 메시지 목록 생성.
 
     Args:
         context_text: 추출된 페이지 텍스트 (고정, 항상 포함)
         history: [{"role": "user"|"assistant", "content": str}, ...] 순서대로
+        highlights: 독자 형광 표시 텍스트 목록 (있을 때만 [READER_FOCUS] 블록 추가)
     """
     trimmed = history[-_MAX_HISTORY:] if len(history) > _MAX_HISTORY else history
 
     system_content = f"{_SYSTEM}\n\n[CONTEXT]\n{context_text}"
+    if highlights:
+        reader_focus = "\n".join(f"- {h}" for h in highlights)
+        system_content += f"\n\n[READER_FOCUS]\n독자가 중요하게 표시한 내용:\n{reader_focus}"
+
     messages = [Message(role="system", content=system_content)]
     for i, msg in enumerate(trimmed):
         content = msg["content"]

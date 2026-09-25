@@ -35,11 +35,13 @@ class NoteSession:
         guideline: str | None = None,
         created: str,
         user_preferred_guideline: str | None = None,
+        highlights: list[str] | None = None,
     ) -> None:
         self.client = client
         self.state: dict = {
             "source_text": context.text,
             "figures": context.figures,
+            "highlights": highlights or [],
             "source": source,
             "pages": pages,
             "topic": topic,
@@ -64,8 +66,10 @@ class NoteSession:
             raise EmptyTextError("요약할 텍스트 없음")
         # guideline 미지정 시 사용자 취향(user: 스코프) 폴백
         guideline = self.state.get("guideline") or self.state.get("user:preferred_guideline")
+        highlights = self.state.get("highlights") or None
         drafts = summarize(
-            self.client, text, topic=self.state["topic"], guideline=guideline, note_count=note_count
+            self.client, text, topic=self.state["topic"], guideline=guideline,
+            note_count=note_count, highlights=highlights,
         )
         self.state["notes"] = [
             self._assemble_note(i, draft, attach_figures=(i == 0))
