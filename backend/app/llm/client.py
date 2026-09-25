@@ -55,28 +55,28 @@ class MockLLMClient:
     def complete(self, messages: list[Message]) -> str:
         user = next((m.content for m in reversed(messages) if m.role == "user"), "")
         task = _field(user, "TASK")
-
         if task == "refine":
             instruction = _field(user, "INSTRUCTION")
             note = _block(user, "NOTE")
             title = _current_title(note) or "리파인된 노트"
             body = _current_body(note) or note
             return f"TITLE: {title}\n\n{body}\n\n[리파인 반영: {instruction}]"
-
         if task == "chat":
             return f"[Mock 응답] {user[:80].strip()}"
+        return _mock_summarize(user)
 
-        # summarize (기본)
-        topic = _field(user, "TOPIC") or "요약"
-        guideline = _field(user, "GUIDELINE")
-        aspect = _field(user, "ASPECT")
-        excerpt = _block(user, "TEXT")[:200].strip()
 
-        title = topic if aspect in ("", "1/1") else f"{topic} ({aspect})"
-        lines = [f"TITLE: {title}", "", f"## {topic}", "", excerpt]
-        if guideline:
-            lines += ["", f"[가이드라인 반영: {guideline}]"]
-        return "\n".join(lines)
+def _mock_summarize(user: str) -> str:
+    """[TASK] summarize 분기 — topic/guideline/aspect/text 필드로 결정적 초안 생성."""
+    topic = _field(user, "TOPIC") or "요약"
+    guideline = _field(user, "GUIDELINE")
+    aspect = _field(user, "ASPECT")
+    excerpt = _block(user, "TEXT")[:200].strip()
+    title = topic if aspect in ("", "1/1") else f"{topic} ({aspect})"
+    lines = [f"TITLE: {title}", "", f"## {topic}", "", excerpt]
+    if guideline:
+        lines += ["", f"[가이드라인 반영: {guideline}]"]
+    return "\n".join(lines)
 
 
 def _current_title(note_markdown: str) -> str:

@@ -6,10 +6,22 @@
 from __future__ import annotations
 
 from ..extractors import get_extractor
-from ..extractor import LayoutExtractor
+from ..extractor import ExtractionResult, LayoutExtractor
 from ..llm import LLMClient, get_llm_client
 from .prepare import prepare_context
 from .session import NoteSession
+
+
+def _collect_highlights(result: ExtractionResult) -> list[str]:
+    """ExtractionResult에서 중복 없는 형광 표시 텍스트를 수집. 순서 유지."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for pe in result.pages:
+        for h in pe.highlights:
+            if h not in seen:
+                seen.add(h)
+                out.append(h)
+    return out
 
 
 def build_session(
@@ -27,19 +39,10 @@ def build_session(
     """추출 → 준비 → NoteSession.start 까지 실행하고 세션을 반환한다."""
     extractor = extractor or get_extractor()
     client = client or get_llm_client()
-
     result = extractor.extract(pdf_path, page_range)
     context = prepare_context(result)
-    pages = [pe.page for pe in result.pages]  # 실제 추출된 페이지들
-
-    seen_h: set[str] = set()
-    all_highlights: list[str] = []
-    for pe in result.pages:
-        for h in pe.highlights:
-            if h not in seen_h:
-                seen_h.add(h)
-                all_highlights.append(h)
-
+    pages = [pe.page for pe in result.pages]
+    highlights = _collect_highlights(result)
     session = NoteSession(
         client=client,
         context=context,
@@ -49,7 +52,7 @@ def build_session(
         guideline=guideline,
         created=created,
         user_preferred_guideline=user_preferred_guideline,
-        highlights=all_highlights or None,
+        highlights=highlights or None,
     )
     session.start(note_count=note_count)
     return session

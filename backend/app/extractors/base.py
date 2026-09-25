@@ -18,6 +18,17 @@ from ..extractor import (
 )
 
 
+def _dedup_ordered(items: list[str]) -> list[str]:
+    """순서를 유지하며 중복을 제거한 새 리스트 반환."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in items:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
 class ExtractionError(RuntimeError):
     """추출 파이프라인 실패 (렌더/응답 획득/파싱)."""
 
@@ -60,6 +71,7 @@ class BaseLayoutExtractor:
 
     # --- 공유 로직 -----------------------------------------------------
     def _assemble_page(self, page_no: int, raw: dict, page: "pymupdf.Page") -> PageExtraction:
+        """raw 응답을 PageExtraction으로 조립 — 블록 파싱 + 형광 추출."""
         meta = raw.get("meta") or {}
         pe = PageExtraction(
             page=page_no,
@@ -68,21 +80,23 @@ class BaseLayoutExtractor:
             render_dpi=self._dpi,
         )
         for rb in raw.get("blocks") or []:
-            bbox_vals = rb.get("bbox") or [0, 0, 0, 0]
-            bbox = BBox(*[float(v) for v in bbox_vals])
-            block_type = normalize_label(rb.get("label", ""))
-            image_ref = self._crop_figure(page, page_no, bbox) if block_type == "figure" else None
-            pe.blocks.append(
-                Block(
-                    type=block_type,
-                    bbox=bbox,
-                    reading_order=rb.get("order"),
-                    text=rb.get("content", "") or "",
-                    image_ref=image_ref,
-                )
-            )
+            pe.blocks.append(self._make_block(rb, page, page_no))
         pe.highlights = self._extract_highlights(page, pe.blocks)
         return pe
+
+    def _make_block(self, rb: dict, page: "pymupdf.Page", page_no: int) -> Block:
+        """raw 블록 딕셔너리를 Block으로 변환. figure면 crop 시도."""
+        bbox_vals = rb.get("bbox") or [0, 0, 0, 0]
+        bbox = BBox(*[float(v) for v in bbox_vals])
+        block_type = normalize_label(rb.get("label", ""))
+        image_ref = self._crop_figure(page, page_no, bbox) if block_type == "figure" else None
+        return Block(
+            type=block_type,
+            bbox=bbox,
+            reading_order=rb.get("order"),
+            text=rb.get("content", "") or "",
+            image_ref=image_ref,
+        )
 
     def _extract_highlights(self, page: "pymupdf.Page", blocks: "list[Block]") -> "list[str]":
         """PDF 형광 표시(highlight) 주석에서 텍스트를 수집한다.
@@ -102,13 +116,7 @@ class BaseLayoutExtractor:
                 text = self._blocks_in_rect(px_rect, blocks)
             if text:
                 results.append(text)
-        seen: set[str] = set()
-        deduped: list[str] = []
-        for t in results:
-            if t not in seen:
-                seen.add(t)
-                deduped.append(t)
-        return deduped
+        return _dedup_ordered(results)
 
     def _blocks_in_rect(self, rect: "pymupdf.Rect", blocks: "list[Block]") -> str:
         """annotation bbox(render 픽셀)와 50% 이상 겹치는 텍스트 블록을 이어붙여 반환."""

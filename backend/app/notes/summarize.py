@@ -18,6 +18,33 @@ _SYSTEM = (
 )
 
 
+def _build_summarize_prompt(
+    text: str,
+    topic: str,
+    guideline: str | None,
+    aspect: str,
+    highlights: list[str] | None,
+) -> str:
+    """요약 프롬프트 조립 — highlights 있을 때만 [READER_FOCUS] 블록 포함."""
+    lines = [
+        "[TASK] summarize",
+        f"[TOPIC] {topic}",
+        f"[GUIDELINE] {guideline or ''}",
+        f"[ASPECT] {aspect}",
+        "[TEXT]",
+        text,
+    ]
+    if highlights:
+        lines += [
+            "",
+            "[READER_FOCUS]",
+            "다음은 독자가 이 페이지에서 중요하다고 표시한 구절입니다.",
+            "요약은 이 독자의 이해 방식을 반영해야 합니다:",
+        ]
+        lines += [f"- {h}" for h in highlights]
+    return "\n".join(lines)
+
+
 def summarize(
     client: LLMClient,
     text: str,
@@ -30,24 +57,8 @@ def summarize(
     """추출 텍스트를 topic/guideline에 맞춰 note_count개 노트 초안으로 요약."""
     drafts: list[NoteDraft] = []
     for i in range(1, note_count + 1):
-        lines = [
-            "[TASK] summarize",
-            f"[TOPIC] {topic}",
-            f"[GUIDELINE] {guideline or ''}",
-            f"[ASPECT] {i}/{note_count}",
-            "[TEXT]",
-            text,
-        ]
-        if highlights:
-            lines += [
-                "",
-                "[READER_FOCUS]",
-                "다음은 독자가 이 페이지에서 중요하다고 표시한 구절입니다.",
-                "요약은 이 독자의 이해 방식을 반영해야 합니다:",
-            ]
-            lines += [f"- {h}" for h in highlights]
-        user = "\n".join(lines)
-        out = client.complete([Message("system", _SYSTEM), Message("user", user)])
+        prompt = _build_summarize_prompt(text, topic, guideline, f"{i}/{note_count}", highlights)
+        out = client.complete([Message("system", _SYSTEM), Message("user", prompt)])
         drafts.append(_parse_draft(out))
     return drafts
 

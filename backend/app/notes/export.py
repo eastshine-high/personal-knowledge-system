@@ -18,32 +18,42 @@ def _safe_filename(name: str, fallback: str) -> str:
     return slug or fallback
 
 
+def _unique_md_filename(title: str, note_id: str, used: set[str]) -> str:
+    """충돌 없는 .md 파일명을 반환하고 used에 등록. 제목 중복 시 -2, -3 접미사."""
+    base = _safe_filename(title, note_id)
+    fname = f"{base}.md"
+    dup = 2
+    while fname in used:
+        fname = f"{base}-{dup}.md"
+        dup += 1
+    used.add(fname)
+    return fname
+
+
+def _write_note_to_zip(
+    zf: zipfile.ZipFile, note: Note, used_md: set[str], added_figs: set[str]
+) -> None:
+    """노트 마크다운과 미첨부 figure 크롭을 zf에 추가."""
+    fname = _unique_md_filename(note.title, note.id, used_md)
+    zf.writestr(fname, note.to_markdown())
+    for fig in note.figures:
+        if fig.embed_name in added_figs:
+            continue
+        src = Path(fig.source_path)
+        if src.is_file():
+            zf.write(src, fig.embed_name)
+            added_figs.add(fig.embed_name)
+
+
 def export_notes(notes: list[Note], out_zip_path: str) -> str:
     """노트[]와 첨부 그림을 zip으로 묶어 out_zip_path에 쓰고 경로를 반환."""
     if not notes:
         raise ValueError("내보낼 노트 없음")
-
     out = Path(out_zip_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-
     used_md: set[str] = set()
     added_figs: set[str] = set()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         for note in notes:
-            base = _safe_filename(note.title, note.id)
-            fname = f"{base}.md"
-            dup = 2
-            while fname in used_md:  # 제목 충돌 방지
-                fname = f"{base}-{dup}.md"
-                dup += 1
-            used_md.add(fname)
-            zf.writestr(fname, note.to_markdown())
-
-            for fig in note.figures:
-                if fig.embed_name in added_figs:
-                    continue
-                src = Path(fig.source_path)
-                if src.is_file():        # 원본 크롭 파일이 있으면 번들에 복사
-                    zf.write(src, fig.embed_name)
-                    added_figs.add(fig.embed_name)
+            _write_note_to_zip(zf, note, used_md, added_figs)
     return str(out)

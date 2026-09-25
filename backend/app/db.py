@@ -22,47 +22,50 @@ def get_db() -> sqlite3.Connection:
     return _local.conn
 
 
+_SCHEMA = """
+    CREATE TABLE IF NOT EXISTS books (
+        id         TEXT PRIMARY KEY,
+        title      TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS pdf_files (
+        id         TEXT PRIMARY KEY,
+        book_id    TEXT NOT NULL REFERENCES books(id),
+        label      TEXT NOT NULL,
+        pdf_path   TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS page_extractions (
+        pdf_file_id TEXT    NOT NULL,
+        page_num    INTEGER NOT NULL,
+        json        TEXT    NOT NULL,
+        created_at  TEXT    NOT NULL,
+        PRIMARY KEY (pdf_file_id, page_num)
+    );
+
+    CREATE TABLE IF NOT EXISTS conversations (
+        id          TEXT PRIMARY KEY,
+        book_id     TEXT NOT NULL REFERENCES books(id),
+        pdf_file_id TEXT NOT NULL REFERENCES pdf_files(id),
+        pages_json  TEXT NOT NULL,
+        title       TEXT,
+        created_at  TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+        id              TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL REFERENCES conversations(id),
+        role            TEXT NOT NULL,
+        content         TEXT NOT NULL,
+        created_at      TEXT NOT NULL
+    );
+"""
+
+
 def init_db() -> None:
     """모든 테이블을 멱등하게 생성. 앱 시작 시 호출."""
     conn = get_db()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS books (
-            id         TEXT PRIMARY KEY,
-            title      TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS pdf_files (
-            id         TEXT PRIMARY KEY,
-            book_id    TEXT NOT NULL REFERENCES books(id),
-            label      TEXT NOT NULL,
-            pdf_path   TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS page_extractions (
-            pdf_file_id TEXT    NOT NULL,
-            page_num    INTEGER NOT NULL,
-            json        TEXT    NOT NULL,
-            created_at  TEXT    NOT NULL,
-            PRIMARY KEY (pdf_file_id, page_num)
-        );
-
-        CREATE TABLE IF NOT EXISTS conversations (
-            id          TEXT PRIMARY KEY,
-            book_id     TEXT NOT NULL REFERENCES books(id),
-            pdf_file_id TEXT NOT NULL REFERENCES pdf_files(id),
-            pages_json  TEXT NOT NULL,
-            title       TEXT,
-            created_at  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS messages (
-            id              TEXT PRIMARY KEY,
-            conversation_id TEXT NOT NULL REFERENCES conversations(id),
-            role            TEXT NOT NULL,
-            content         TEXT NOT NULL,
-            created_at      TEXT NOT NULL
-        );
-    """)
+    conn.executescript(_SCHEMA)
     conn.commit()

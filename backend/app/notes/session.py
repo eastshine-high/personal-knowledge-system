@@ -23,6 +23,29 @@ class EmptyTextError(ValueError):
     """요약할 텍스트가 없음 (빈 노트 생성 방지)."""
 
 
+def _make_initial_state(
+    context: PreparedContext,
+    source: str,
+    pages: list[int],
+    topic: str,
+    guideline: str | None,
+    created: str,
+    highlights: list[str] | None,
+) -> dict:
+    """NoteSession 초기 state 딕셔너리 생성."""
+    return {
+        "source_text": context.text,
+        "figures": context.figures,
+        "highlights": highlights or [],
+        "source": source,
+        "pages": pages,
+        "topic": topic,
+        "guideline": guideline,
+        "created": created,
+        "notes": [],
+    }
+
+
 class NoteSession:
     def __init__(
         self,
@@ -38,21 +61,11 @@ class NoteSession:
         highlights: list[str] | None = None,
     ) -> None:
         self.client = client
-        self.state: dict = {
-            "source_text": context.text,
-            "figures": context.figures,
-            "highlights": highlights or [],
-            "source": source,
-            "pages": pages,
-            "topic": topic,
-            "guideline": guideline,
-            "created": created,
-            "notes": [],
-        }
+        self.state = _make_initial_state(context, source, pages, topic, guideline, created, highlights)
         if user_preferred_guideline is not None:
             self.state["user:preferred_guideline"] = user_preferred_guideline
         self.events: list[SessionEvent] = []
-        self._current_seq: int = -1  # 현재 노트 상태가 대응하는 이벤트 seq
+        self._current_seq: int = -1
 
     @property
     def notes(self) -> list[Note]:

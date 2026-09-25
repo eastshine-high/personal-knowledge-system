@@ -52,6 +52,23 @@ class SessionEvent:
     state_delta: dict     # 이 시점의 변경분 (notes 스냅샷 등)
 
 
+def _build_frontmatter(note: "Note") -> list[str]:
+    """옵시디언 YAML 프론트매터 줄 목록 반환 (--- 구분자 포함)."""
+    pages = "[" + ", ".join(str(p) for p in note.pages) + "]"
+    tags = "[" + ", ".join(_yaml_str(t) for t in note.tags) + "]"
+    return [
+        "---",
+        f"id: {note.id}",
+        f"title: {_yaml_str(note.title)}",
+        f"source: {_yaml_str(note.source)}",
+        f"pages: {pages}",
+        f"topic: {_yaml_str(note.topic)}",
+        f"tags: {tags}",
+        f"created: {note.created}",
+        "---",
+    ]
+
+
 @dataclass
 class Note:
     """프론트매터 + 본문 + 첨부 그림을 가진 요약 노트."""
@@ -72,21 +89,7 @@ class Note:
         그림 임베드(![[..]])는 body가 아니라 `self.figures`(1급 상태)에서 렌더한다.
         → refine/직접편집이 body만 바꿔도 그림 참조가 항상 유지된다.
         """
-        pages = "[" + ", ".join(str(p) for p in self.pages) + "]"
-        tags = "[" + ", ".join(_yaml_str(t) for t in self.tags) + "]"
-        parts = [
-            "---",
-            f"id: {self.id}",
-            f"title: {_yaml_str(self.title)}",
-            f"source: {_yaml_str(self.source)}",
-            f"pages: {pages}",
-            f"topic: {_yaml_str(self.topic)}",
-            f"tags: {tags}",
-            f"created: {self.created}",
-            "---",
-            "",
-            self.body.rstrip(),
-        ]
+        parts = _build_frontmatter(self) + ["", self.body.rstrip()]
         if self.figures:
             embeds = "\n".join(
                 f"![[{f.embed_name}]]" + (f"\n*{f.caption}*" if f.caption else "")

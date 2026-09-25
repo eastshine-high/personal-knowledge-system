@@ -1,6 +1,7 @@
 """자유 대화 API — 대화 생성·조회·메시지 전송."""
 from __future__ import annotations
 
+import json as _json
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated
@@ -9,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .config import get_settings
 from .db import get_db
-from .extractor import LayoutExtractor
+from .extractor import ExtractionResult, LayoutExtractor
 from .extractors import get_extractor
 from .llm import LLMClient, get_llm_client
 from .llm.chat_prompt import build_chat_messages
@@ -26,6 +27,8 @@ from .schemas import (
 
 router = APIRouter(tags=["chat"])
 
+_HMARKER = "\n\n[HIGHLIGHTS_JSON]"
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -40,8 +43,7 @@ def _llm_dep() -> LLMClient:
 
 
 def _row_to_conv(row) -> ConversationResponse:
-    import json
-    pages = json.loads(row["pages_json"])
+    pages = _json.loads(row["pages_json"])
     return ConversationResponse(
         id=row["id"],
         book_id=row["book_id"],
@@ -63,6 +65,83 @@ def _row_to_msg(row) -> MessageResponse:
     )
 
 
+def _resolve_pdf_row(db, book_id: str, pdf_file_id: str):
+    """book + pdf 존재 검증 후 pdf_row 반환. 없으면 HTTPException."""
+    if not db.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone():
+        raise HTTPException(status_code=404, detail="책 없음")
+    row = db.execute(
+        "SELECT * FROM pdf_files WHERE id = ? AND book_id = ?",
+        (pdf_file_id, book_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="PDF 파일 없음")
+    return row
+
+
+def _collect_page_highlights(page_extractions, use_highlights: bool) -> list[str]:
+    """use_highlights=True일 때만 페이지 추출물에서 중복 없는 형광 텍스트 수집."""
+    if not use_highlights:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for pe in page_extractions:
+        for h in pe.highlights:
+            if h not in seen:
+                seen.add(h)
+                out.append(h)
+    return out
+
+
+def _build_sys_content(context_text: str, highlights: list[str]) -> str:
+    """context_text + (선택) highlights를 시스템 메시지 content로 조립."""
+    if highlights:
+        return context_text + _HMARKER + _json.dumps(highlights, ensure_ascii=False)
+    return context_text
+
+
+def _restore_context(db, conv_id: str) -> tuple[str, list[str]]:
+    """system 메시지에서 context_text와 highlights를 복원."""
+    sys_row = db.execute(
+        "SELECT content FROM messages WHERE conversation_id = ? AND role = 'system' LIMIT 1",
+        (conv_id,),
+    ).fetchone()
+    raw_sys = sys_row["content"] if sys_row else ""
+    if _HMARKER in raw_sys:
+        parts = raw_sys.split(_HMARKER, 1)
+        try:
+            return parts[0], _json.loads(parts[1])
+        except (ValueError, IndexError):
+            return parts[0], []
+    return raw_sys, []
+
+
+def _load_history(db, conv_id: str) -> list[dict]:
+    """대화의 user/assistant 메시지 이력을 시간순으로 반환."""
+    rows = db.execute(
+        "SELECT role, content FROM messages "
+        "WHERE conversation_id = ? AND role != 'system' ORDER BY created_at",
+        (conv_id,),
+    ).fetchall()
+    return [{"role": r["role"], "content": r["content"]} for r in rows]
+
+
+def _persist_exchange(db, conv_id: str, user_content: str, assistant_text: str, now: str, had_title: bool) -> str:
+    """user + assistant 메시지 저장. 첫 메시지면 대화 제목도 설정. assistant message id 반환."""
+    user_id, asst_id = str(uuid.uuid4()), str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
+        (user_id, conv_id, "user", user_content, now),
+    )
+    db.execute(
+        "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
+        (asst_id, conv_id, "assistant", assistant_text, now),
+    )
+    if not had_title:
+        db.execute("UPDATE conversations SET title = ? WHERE id = ?", (user_content[:20].strip(), conv_id))
+    db.commit()
+    return asst_id
+
+
 @router.get("/books/{book_id}/conversations", response_model=list[ConversationResponse])
 def list_conversations(book_id: str, db=Depends(get_db)):
     if not db.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone():
@@ -81,70 +160,31 @@ def create_conversation(
     db=Depends(get_db),
     extractor: Annotated[LayoutExtractor, Depends(_extractor_dep)] = None,
 ):
-    import json as _json
-
-    if not db.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone():
-        raise HTTPException(status_code=404, detail="책 없음")
-
-    pdf_row = db.execute(
-        "SELECT * FROM pdf_files WHERE id = ? AND book_id = ?",
-        (req.pdf_file_id, book_id),
-    ).fetchone()
-    if not pdf_row:
-        raise HTTPException(status_code=404, detail="PDF 파일 없음")
-
+    pdf_row = _resolve_pdf_row(db, book_id, req.pdf_file_id)
     try:
         pages = parse_pages(req.pages_str)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    # OCR 캐시 경유 추출 (텍스트 컨텍스트 준비)
-    page_extractions = get_or_extract(
-        db, req.pdf_file_id, pages, pdf_row["pdf_path"], extractor
-    )
+    page_extractions = get_or_extract(db, req.pdf_file_id, pages, pdf_row["pdf_path"], extractor)
+    context: PreparedContext = prepare_context(ExtractionResult(source=pdf_row["pdf_path"], pages=page_extractions))
+    highlights = _collect_page_highlights(page_extractions, req.use_highlights)
 
-    # ExtractionResult 조립 → PreparedContext
-    from .extractor import ExtractionResult
-    result = ExtractionResult(source=pdf_row["pdf_path"], pages=page_extractions)
-    context: PreparedContext = prepare_context(result)
-
-    # 대화 저장 (context_text는 messages 전송 시 재구성)
-    conv_id = str(uuid.uuid4())
-    now = _now()
+    conv_id, now = str(uuid.uuid4()), _now()
     db.execute(
         "INSERT INTO conversations (id, book_id, pdf_file_id, pages_json, title, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?)",
         (conv_id, book_id, req.pdf_file_id, _json.dumps(pages), None, now),
     )
-    # highlights 수집 — use_highlights=True일 때만 (기본 off)
-    all_highlights: list[str] = []
-    if req.use_highlights:
-        _seen_h: set[str] = set()
-        for pe in page_extractions:
-            for h in pe.highlights:
-                if h not in _seen_h:
-                    _seen_h.add(h)
-                    all_highlights.append(h)
-
-    # context_text (+ highlights) 를 system 메시지로 저장해 이후 대화에서 재사용
-    sys_content = context.text
-    if all_highlights:
-        sys_content += "\n\n[HIGHLIGHTS_JSON]" + _json.dumps(all_highlights, ensure_ascii=False)
     sys_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
-        (sys_id, conv_id, "system", sys_content, now),
+        (sys_id, conv_id, "system", _build_sys_content(context.text, highlights), now),
     )
     db.commit()
-
     return ConversationResponse(
-        id=conv_id,
-        book_id=book_id,
-        pdf_file_id=req.pdf_file_id,
-        pages=pages,
-        pages_display=format_pages(pages),
-        title=None,
-        created_at=now,
+        id=conv_id, book_id=book_id, pdf_file_id=req.pdf_file_id,
+        pages=pages, pages_display=format_pages(pages), title=None, created_at=now,
     )
 
 
@@ -170,55 +210,16 @@ def send_message(
     if not conv_row:
         raise HTTPException(status_code=404, detail="대화 없음")
 
-    # context_text 복원 (system 메시지)
-    sys_row = db.execute(
-        "SELECT content FROM messages WHERE conversation_id = ? AND role = 'system' LIMIT 1",
-        (conv_id,),
-    ).fetchone()
-    raw_sys = sys_row["content"] if sys_row else ""
-    _HMARKER = "\n\n[HIGHLIGHTS_JSON]"
-    if _HMARKER in raw_sys:
-        _parts = raw_sys.split(_HMARKER, 1)
-        context_text = _parts[0]
-        try:
-            import json as _json2
-            highlights: list[str] = _json2.loads(_parts[1])
-        except (ValueError, IndexError):
-            highlights = []
-    else:
-        context_text = raw_sys
-        highlights = []
-
-    # 기존 user/assistant 히스토리
-    history_rows = db.execute(
-        "SELECT role, content FROM messages "
-        "WHERE conversation_id = ? AND role != 'system' ORDER BY created_at",
-        (conv_id,),
-    ).fetchall()
-    history = [{"role": r["role"], "content": r["content"]} for r in history_rows]
+    context_text, highlights = _restore_context(db, conv_id)
+    history = _load_history(db, conv_id)
     history.append({"role": "user", "content": req.content})
 
     messages = build_chat_messages(context_text, history, highlights or None)
     assistant_text = client.complete(messages)
 
     now = _now()
-    user_id = str(uuid.uuid4())
-    asst_id = str(uuid.uuid4())
-    db.execute(
-        "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
-        (user_id, conv_id, "user", req.content, now),
-    )
-    db.execute(
-        "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
-        (asst_id, conv_id, "assistant", assistant_text, now),
-    )
-    # 첫 메시지로 대화 제목 자동 설정
-    if not conv_row["title"]:
-        title = req.content[:20].strip()
-        db.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, conv_id))
-    db.commit()
+    asst_id = _persist_exchange(db, conv_id, req.content, assistant_text, now, bool(conv_row["title"]))
 
-    import json as _json
     pages = _json.loads(conv_row["pages_json"])
     conv_resp = ConversationResponse(
         id=conv_id, book_id=conv_row["book_id"], pdf_file_id=conv_row["pdf_file_id"],

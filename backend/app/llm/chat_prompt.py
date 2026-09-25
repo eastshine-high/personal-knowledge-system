@@ -11,6 +11,15 @@ _SYSTEM = (
 )
 
 
+def _build_system_content(context_text: str, highlights: list[str] | None) -> str:
+    """시스템 메시지 content 조립 — 컨텍스트 + (선택) [READER_FOCUS] 블록."""
+    content = f"{_SYSTEM}\n\n[CONTEXT]\n{context_text}"
+    if highlights:
+        focus = "\n".join(f"- {h}" for h in highlights)
+        content += f"\n\n[READER_FOCUS]\n독자가 중요하게 표시한 내용:\n{focus}"
+    return content
+
+
 def build_chat_messages(
     context_text: str,
     history: list[dict],
@@ -24,13 +33,7 @@ def build_chat_messages(
         highlights: 독자 형광 표시 텍스트 목록 (있을 때만 [READER_FOCUS] 블록 추가)
     """
     trimmed = history[-_MAX_HISTORY:] if len(history) > _MAX_HISTORY else history
-
-    system_content = f"{_SYSTEM}\n\n[CONTEXT]\n{context_text}"
-    if highlights:
-        reader_focus = "\n".join(f"- {h}" for h in highlights)
-        system_content += f"\n\n[READER_FOCUS]\n독자가 중요하게 표시한 내용:\n{reader_focus}"
-
-    messages = [Message(role="system", content=system_content)]
+    messages = [Message(role="system", content=_build_system_content(context_text, highlights))]
     for i, msg in enumerate(trimmed):
         content = msg["content"]
         if i == len(trimmed) - 1 and msg["role"] == "user":

@@ -81,34 +81,34 @@ class ModalLayoutExtractor(BaseLayoutExtractor):
                 time.sleep(self._retry_backoff_s * (attempt + 1))
 
     def _call_endpoint(self, img_bytes: bytes) -> dict:
-        """엔드포인트 호출. transient(5xx/네트워크/타임아웃)는 재시도, 4xx는 즉시 실패.
-
-        각 호출은 독립적(멱등)이라 재시도해도 상태가 손상되지 않는다.
-        """
+        """엔드포인트 호출. transient(5xx/네트워크/타임아웃)는 재시도, 4xx는 즉시 실패."""
         last_error: ExtractionError | None = None
         for attempt in range(self._max_retries + 1):
-            try:
-                resp = httpx.post(
-                    f"{self._url}/parse",
-                    headers={"Authorization": f"Bearer {self._token}"},
-                    content=img_bytes,
-                    timeout=self._timeout,
-                )
-            except httpx.HTTPError as exc:  # 네트워크/타임아웃 등 → transient
-                last_error = ExtractionError(f"endpoint 호출 실패: {exc}")
-            else:
-                if resp.status_code == 200:
-                    try:
-                        return resp.json()
-                    except ValueError as exc:
-                        raise ExtractionError("endpoint 응답이 JSON이 아님") from exc
-                if 500 <= resp.status_code < 600:  # 서버/인프라 오류(콜드스타트 유실 등) → transient
-                    last_error = ExtractionError(f"endpoint {resp.status_code}: {resp.text[:200]}")
-                else:  # 4xx 등 영구 오류 → 재시도 안 함
-                    raise ExtractionError(f"endpoint {resp.status_code}: {resp.text[:200]}")
-
+            result = self._try_post(img_bytes)
+            if isinstance(result, dict):
+                return result
+            last_error = result
             if attempt < self._max_retries:
-                time.sleep(self._retry_backoff_s * (attempt + 1))  # 선형 백오프
-
+                time.sleep(self._retry_backoff_s * (attempt + 1))
         assert last_error is not None
         raise last_error
+
+    def _try_post(self, img_bytes: bytes) -> "dict | ExtractionError":
+        """엔드포인트에 1회 POST. 성공: dict 반환. transient: ExtractionError 반환. 4xx: raise."""
+        try:
+            resp = httpx.post(
+                f"{self._url}/parse",
+                headers={"Authorization": f"Bearer {self._token}"},
+                content=img_bytes,
+                timeout=self._timeout,
+            )
+        except httpx.HTTPError as exc:
+            return ExtractionError(f"endpoint 호출 실패: {exc}")
+        if resp.status_code == 200:
+            try:
+                return resp.json()
+            except ValueError as exc:
+                raise ExtractionError("endpoint 응답이 JSON이 아님") from exc
+        if 500 <= resp.status_code < 600:
+            return ExtractionError(f"endpoint {resp.status_code}: {resp.text[:200]}")
+        raise ExtractionError(f"endpoint {resp.status_code}: {resp.text[:200]}")

@@ -59,42 +59,51 @@ def _nearest_caption(
     return ""
 
 
+def _collect_captions_by_page(
+    ordered: list[tuple[int, Block]],
+) -> dict[int, list[Block]]:
+    """ordered 블록 목록에서 figure_caption을 페이지별로 그룹화."""
+    result: dict[int, list[Block]] = {}
+    for page, b in ordered:
+        if b.type == "figure_caption":
+            result.setdefault(page, []).append(b)
+    return result
+
+
+def _iter_content(
+    ordered: list[tuple[int, Block]],
+    captions_by_page: dict[int, list[Block]],
+    threshold_px: float,
+) -> tuple[list[str], list[PreparedFigure]]:
+    """ordered 블록을 순회해 텍스트 조각과 figure 목록을 수집."""
+    used_captions: set[int] = set()
+    text_parts: list[str] = []
+    figures: list[PreparedFigure] = []
+    for page, b in ordered:
+        if b.type in CONTENT_TYPES and b.text.strip():
+            text_parts.append(b.text.strip())
+        elif b.type == "figure":
+            caption = _nearest_caption(
+                b, captions_by_page.get(page, []), used_captions, threshold_px
+            )
+            figures.append(PreparedFigure(
+                source_path=b.image_ref or "",
+                caption=caption,
+                page=page,
+                anchor_index=len(text_parts),
+                bbox=b.bbox,
+            ))
+    return text_parts, figures
+
+
 def prepare_context(
     result: ExtractionResult, *, caption_gap_threshold_px: float = 250.0
 ) -> PreparedContext:
     """ExtractionResult → (LLM용 텍스트, 페어링된 figure 목록)."""
-    # (page, bbox.y) 시각 읽기순서로 전체 블록 정렬
-    ordered: list[tuple[int, Block]] = [
-        (pe.page, b) for pe in result.pages for b in pe.blocks
-    ]
-    ordered.sort(key=lambda pb: (pb[0], pb[1].bbox.y0))
-
-    captions_by_page: dict[int, list[Block]] = {}
-    for page, b in ordered:
-        if b.type == "figure_caption":
-            captions_by_page.setdefault(page, []).append(b)
-
-    used_captions: set[int] = set()
-    text_parts: list[str] = []
-    figures: list[PreparedFigure] = []
-
-    for page, b in ordered:
-        if b.type in CONTENT_TYPES:
-            if b.text.strip():
-                text_parts.append(b.text.strip())
-        elif b.type == "figure":
-            caption = _nearest_caption(
-                b, captions_by_page.get(page, []), used_captions, caption_gap_threshold_px
-            )
-            figures.append(
-                PreparedFigure(
-                    source_path=b.image_ref or "",
-                    caption=caption,
-                    page=page,
-                    anchor_index=len(text_parts),  # 지금까지 쌓인 텍스트 조각 수
-                    bbox=b.bbox,
-                )
-            )
-        # 그 외(header/footer/number/figure_caption/other) → 컨텍스트에서 제외
-
+    ordered: list[tuple[int, Block]] = sorted(
+        [(pe.page, b) for pe in result.pages for b in pe.blocks],
+        key=lambda pb: (pb[0], pb[1].bbox.y0),
+    )
+    captions_by_page = _collect_captions_by_page(ordered)
+    text_parts, figures = _iter_content(ordered, captions_by_page, caption_gap_threshold_px)
     return PreparedContext(text="\n\n".join(text_parts), figures=figures)
