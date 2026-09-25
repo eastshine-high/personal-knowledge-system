@@ -116,14 +116,15 @@ def create_conversation(
         "VALUES (?, ?, ?, ?, ?, ?)",
         (conv_id, book_id, req.pdf_file_id, _json.dumps(pages), None, now),
     )
-    # highlights 수집 (페이지 전체, 중복 제거, 읽기 순서 보존)
-    _seen_h: set[str] = set()
+    # highlights 수집 — use_highlights=True일 때만 (기본 off)
     all_highlights: list[str] = []
-    for pe in page_extractions:
-        for h in pe.highlights:
-            if h not in _seen_h:
-                _seen_h.add(h)
-                all_highlights.append(h)
+    if req.use_highlights:
+        _seen_h: set[str] = set()
+        for pe in page_extractions:
+            for h in pe.highlights:
+                if h not in _seen_h:
+                    _seen_h.add(h)
+                    all_highlights.append(h)
 
     # context_text (+ highlights) 를 system 메시지로 저장해 이후 대화에서 재사용
     sys_content = context.text

@@ -110,10 +110,11 @@ export function createConversation(
   bookId: string,
   pdf_file_id: string,
   pages_str: string,
+  use_highlights: boolean = false,
 ): Promise<Conversation> {
   return request(`/books/${bookId}/conversations`, {
     method: "POST",
-    body: JSON.stringify({ pdf_file_id, pages_str }),
+    body: JSON.stringify({ pdf_file_id, pages_str, use_highlights }),
   });
 }
 

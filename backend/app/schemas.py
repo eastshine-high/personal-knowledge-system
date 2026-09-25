@@ -45,6 +45,7 @@ class ConversationResponse(BaseModel):
 class ConversationCreate(BaseModel):
     pdf_file_id: str
     pages_str: str          # "10-15, 21" 형식
+    use_highlights: bool = False
 
 
 class MessageResponse(BaseModel):
