@@ -36,7 +36,7 @@ class _StubExtractor:
 @pytest.fixture
 def client():
     from app.main import app
-    from app.chat_router import _extractor_dep, _llm_dep
+    from app.presentation.chat_router import _extractor_dep, _llm_dep
     app.dependency_overrides[_extractor_dep] = lambda: _StubExtractor()
     app.dependency_overrides[_llm_dep] = lambda: get_llm_client(
         get_settings().__class__(**{**get_settings().__dict__, "llm_backend": "mock"})

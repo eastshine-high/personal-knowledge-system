@@ -88,6 +88,23 @@ npm run test:e2e:headed   # 브라우저 보면서 실행
 - 외부 API는 `page.route()`로 mock — 재현성 ↑, 비용 0
 - `/evaluate` subagent가 자동으로 `npm run test:e2e` 실행 + `test-results.json` 파싱
 
+### 백엔드 아키텍처 — DDD 레이어드 아키텍처 (`backend/app/`)
+
+4개 레이어로 구성. 의존 방향: `presentation → application → domain ← infrastructure`
+
+```
+backend/app/
+├── presentation/    # HTTP 핸들러 · DI · 스키마 변환만. FastAPI 허용
+├── application/     # 유스케이스 · DB 쿼리. FastAPI import 금지
+├── domain/          # 순수 모델 · 인터페이스. 외부 라이브러리 의존 금지
+├── infrastructure/  # 외부 시스템 구현체 (LLM, OCR, DB 캐시)
+└── schemas/         # 공용 Pydantic DTO. __init__.py에서 전체 re-export
+```
+
+- **레이어 규칙**: `presentation/`은 `application/`을 호출. `application/`은 `fastapi` import 불가.
+- **파일 명명**: 디렉토리 없이 파일명만 봐도 역할이 명확해야 한다 (예: `chat_service.py`, `library_repository.py`, `mock_llm_client.py`).
+- **테스트 DI**: `dependency_overrides`용 함수는 `presentation/` 레이어에서 import.
+
 ### 백엔드 코딩 컨벤션 (`backend/`)
 
 - **단일 책임**: 파일 하나는 하나의 책임만 진다. 역할이 다르면 파일을 나눈다.

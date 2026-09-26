@@ -3,10 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import router
-from .chat_router import router as chat_router
 from .db import init_db
-from .library_router import router as library_router
+from .presentation.notes_router import router
+from .presentation.chat_router import router as chat_router
+from .presentation.library_router import router as library_router
 
 
 @asynccontextmanager

@@ -1,4 +1,4 @@
-"""FastAPI 라우터 — 세션 생성·조회·리파인·내보내기 엔드포인트."""
+"""노트 세션 API — 세션 생성·조회·리파인·편집·내보내기 (thin HTTP 핸들러)."""
 from __future__ import annotations
 
 import os
@@ -12,15 +12,16 @@ import pymupdf
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
-from .config import get_settings
-from .extractor import LayoutExtractor
-from .extractors import get_extractor
-from .extractors.base import ExtractionError
-from .llm import LLMClient, get_llm_client
-from .notes import EmptyTextError, NoteSession, build_session
-from .notes.models import Note
-from .notes.orchestrate import BuildSessionRequest
-from .schemas import (
+from ..config import get_settings
+from ..extractor import LayoutExtractor
+from ..extractors import get_extractor
+from ..extractors.base import ExtractionError
+from ..llm import LLMClient, get_llm_client
+from ..notes import EmptyTextError, NoteSession, build_session
+from ..notes.models import Note
+from ..notes.orchestrate import BuildSessionRequest
+from ..infrastructure.note_session_store import _sessions, get_session, put_session
+from ..schemas import (
     CreateSessionRequest,
     EditRequest,
     EventResponse,
@@ -31,9 +32,6 @@ from .schemas import (
 )
 
 router = APIRouter()
-
-# 인메모리 세션 스토어: session_id → (NoteSession, pdf_path)
-_sessions: dict[str, tuple[NoteSession, str]] = {}
 
 
 # --- 의존성 (테스트에서 dependency_overrides로 교체 가능) ------------------
@@ -74,6 +72,13 @@ def _session_resp(session_id: str, session: NoteSession) -> SessionResponse:
     )
 
 
+def _get_session(session_id: str) -> NoteSession:
+    entry = get_session(session_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="세션 없음")
+    return entry[0]
+
+
 # --- 엔드포인트 ------------------------------------------------------------
 
 @router.post("/sessions", response_model=SessionResponse, status_code=201)
@@ -105,15 +110,8 @@ def create_session(
         raise HTTPException(status_code=422, detail=str(e))
 
     session_id = str(uuid.uuid4())
-    _sessions[session_id] = (session, req.pdf_path)
+    put_session(session_id, session, req.pdf_path)
     return _session_resp(session_id, session)
-
-
-def _get_session(session_id: str) -> NoteSession:
-    entry = _sessions.get(session_id)
-    if entry is None:
-        raise HTTPException(status_code=404, detail="세션 없음")
-    return entry[0]
 
 
 @router.get("/sessions/{session_id}/notes", response_model=list[NoteResponse])
@@ -149,7 +147,8 @@ def edit_note(session_id: str, note_id: str, req: EditRequest) -> NoteResponse:
 def get_page_image(session_id: str, page_num: int) -> Response:
     """PDF 페이지를 PNG로 렌더링해서 반환한다."""
     _get_session(session_id)  # 404 체크
-    pdf_path = _sessions[session_id][1]
+    entry = get_session(session_id)
+    pdf_path = entry[1]
 
     try:
         doc = pymupdf.open(pdf_path)

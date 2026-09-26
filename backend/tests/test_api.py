@@ -8,7 +8,7 @@ import pymupdf
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api import _extractor_dep, _llm_dep
+from app.presentation.notes_router import _extractor_dep, _llm_dep
 from app.extractor import BBox, Block, ExtractionResult, PageExtraction
 from app.config import get_settings
 from app.llm.client import MockLLMClient
