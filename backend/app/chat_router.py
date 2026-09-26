@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json as _json
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -9,11 +10,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .config import get_settings
+from .config import Settings, get_settings
 from .db import get_db
 from .extractor import ExtractionResult, LayoutExtractor
 from .extractors import get_extractor
-from .llm import LLMClient, get_llm_client
+from .extractors.base import ExtractionError
+from .llm import LLMClient, LLMUsage, get_llm_client
 from .llm.chat_prompt import build_chat_messages
 from .notes.prepare import PreparedContext, prepare_context
 from .ocr_cache import ExtractionTarget, get_or_extract
@@ -22,6 +24,8 @@ from .schemas import (
     ChatResponse,
     ConversationCreate,
     ConversationResponse,
+    ExtractionStatsResponse,
+    LLMUsageResponse,
     MessageCreate,
     MessageResponse,
 )
@@ -46,12 +50,16 @@ def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
 
-def _extractor_dep() -> LayoutExtractor:
-    return get_extractor(get_settings())
+def _settings_dep() -> Settings:
+    return get_settings()
 
 
-def _llm_dep() -> LLMClient:
-    return get_llm_client(get_settings())
+def _extractor_dep(settings: Annotated[Settings, Depends(_settings_dep)]) -> LayoutExtractor:
+    return get_extractor(settings)
+
+
+def _llm_dep(settings: Annotated[Settings, Depends(_settings_dep)]) -> LLMClient:
+    return get_llm_client(settings)
 
 
 def _row_to_conv(row) -> ConversationResponse:
@@ -102,6 +110,22 @@ def _collect_page_highlights(page_extractions, use_highlights: bool) -> list[str
                 seen.add(h)
                 out.append(h)
     return out
+
+
+_MODAL_COST_PER_S = 0.000211  # Modal A10G GPU 추정 요금 ($/s)
+
+
+def _build_usage_response(usage: LLMUsage | None) -> LLMUsageResponse | None:
+    """LLMUsage → LLMUsageResponse 변환. usage가 None이거나 cost_usd 계산 불가면 cost_usd=None."""
+    if not usage:
+        return None
+    cost = usage.cost_usd
+    return LLMUsageResponse(
+        model=usage.model,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cost_usd=round(cost, 6) if cost is not None else None,
+    )
 
 
 def _build_sys_content(context_text: str, highlights: list[str]) -> str:
@@ -171,6 +195,7 @@ def create_conversation(
     req: ConversationCreate,
     db=Depends(get_db),
     extractor: Annotated[LayoutExtractor, Depends(_extractor_dep)] = None,
+    settings: Annotated[Settings, Depends(_settings_dep)] = None,
 ):
     pdf_row = _resolve_pdf_row(db, book_id, req.pdf_file_id)
     try:
@@ -178,11 +203,23 @@ def create_conversation(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    page_extractions = get_or_extract(
-        db,
-        ExtractionTarget(pdf_file_id=req.pdf_file_id, pages=pages, pdf_path=pdf_row["pdf_path"]),
-        extractor,
+    t0 = time.monotonic()
+    try:
+        page_extractions, newly_extracted = get_or_extract(
+            db,
+            ExtractionTarget(pdf_file_id=req.pdf_file_id, pages=pages, pdf_path=pdf_row["pdf_path"]),
+            extractor,
+        )
+    except ExtractionError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    elapsed = time.monotonic() - t0
+
+    modal_cost = round(elapsed * _MODAL_COST_PER_S, 5) if settings.extract_backend == "modal" and newly_extracted > 0 else None
+    extraction_stats = ExtractionStatsResponse(
+        page_count=len(page_extractions), elapsed_s=round(elapsed, 2),
+        backend=settings.extract_backend, cost_usd=modal_cost,
     )
+
     context: PreparedContext = prepare_context(ExtractionResult(source=pdf_row["pdf_path"], pages=page_extractions))
     highlights = _collect_page_highlights(page_extractions, req.use_highlights)
 
@@ -201,6 +238,7 @@ def create_conversation(
     return ConversationResponse(
         id=conv_id, book_id=book_id, pdf_file_id=req.pdf_file_id,
         pages=pages, pages_display=format_pages(pages), title=None, created_at=now,
+        extraction_stats=extraction_stats,
     )
 
 
@@ -231,7 +269,8 @@ def send_message(
     history.append({"role": "user", "content": req.content})
 
     messages = build_chat_messages(context_text, history, highlights or None)
-    assistant_text = client.complete(messages)
+    llm_resp = client.complete(messages)
+    assistant_text = llm_resp.text
 
     now = _now()
     asst_id = _persist_exchange(db, ChatExchange(
@@ -253,4 +292,4 @@ def send_message(
         id=asst_id, conversation_id=conv_id, role="assistant",
         content=assistant_text, created_at=now,
     )
-    return ChatResponse(conversation=conv_resp, message=msg_resp)
+    return ChatResponse(conversation=conv_resp, message=msg_resp, usage=_build_usage_response(llm_resp.usage))

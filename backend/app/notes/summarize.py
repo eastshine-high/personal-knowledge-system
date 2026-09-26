@@ -33,12 +33,13 @@ class SummarizeRequest:
 
 @dataclass
 class RefineRequest:
-    """리파인 요청 파라미터 — 현재 노트 + 지시 + 원문 + 이력."""
+    """리파인 요청 파라미터 — 현재 노트 + 지시 + 원문 + 이력 + 가이드라인."""
 
     note_markdown: str
     instruction: str
     text: str
     history: list[str] | None = None
+    guideline: str | None = None
 
 
 def _build_summarize_prompt(req: SummarizeRequest, aspect: str) -> str:
@@ -68,13 +69,15 @@ def summarize(client: LLMClient, req: SummarizeRequest) -> list[NoteDraft]:
     for i in range(1, req.note_count + 1):
         prompt = _build_summarize_prompt(req, f"{i}/{req.note_count}")
         out = client.complete([Message("system", _SYSTEM), Message("user", prompt)])
-        drafts.append(_parse_draft(out))
+        drafts.append(_parse_draft(out.text))
     return drafts
 
 
 def refine(client: LLMClient, req: RefineRequest) -> NoteDraft:
     """현재 노트를 후속 지시로 다듬는다. 원문 텍스트 + 최근 지시(history)를 맥락으로 전달(다중턴)."""
     lines = ["[TASK] refine"]
+    if req.guideline:
+        lines.append(f"[GUIDELINE] {req.guideline}")
     if req.history:
         lines.append("[HISTORY]")
         lines += [f"- {h}" for h in req.history]
@@ -86,7 +89,7 @@ def refine(client: LLMClient, req: RefineRequest) -> NoteDraft:
         req.text,
     ]
     out = client.complete([Message("system", _SYSTEM), Message("user", "\n".join(lines))])
-    return _parse_draft(out)
+    return _parse_draft(out.text)
 
 
 def _parse_draft(text: str) -> NoteDraft:

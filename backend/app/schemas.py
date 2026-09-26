@@ -32,6 +32,20 @@ class PdfFileCreate(BaseModel):
 
 # --- 자유 대화 ---------------------------------------------------------------
 
+class LLMUsageResponse(BaseModel):
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cost_usd: float | None = None
+
+
+class ExtractionStatsResponse(BaseModel):
+    page_count: int
+    elapsed_s: float
+    backend: str
+    cost_usd: float | None = None   # Modal 추정 비용 (A10G ~$0.000211/s)
+
+
 class ConversationResponse(BaseModel):
     id: str
     book_id: str
@@ -40,6 +54,7 @@ class ConversationResponse(BaseModel):
     pages_display: str      # "p.10-15, 21"
     title: str | None
     created_at: str
+    extraction_stats: ExtractionStatsResponse | None = None
 
 
 class ConversationCreate(BaseModel):
@@ -63,6 +78,7 @@ class MessageCreate(BaseModel):
 class ChatResponse(BaseModel):
     conversation: ConversationResponse
     message: MessageResponse
+    usage: LLMUsageResponse | None = None
 
 
 class FigureResponse(BaseModel):

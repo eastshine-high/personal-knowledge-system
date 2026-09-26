@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 from .config import get_settings
 from .extractor import LayoutExtractor
 from .extractors import get_extractor
+from .extractors.base import ExtractionError
 from .llm import LLMClient, get_llm_client
 from .notes import EmptyTextError, NoteSession, build_session
 from .notes.models import Note
@@ -98,6 +99,8 @@ def create_session(
         )
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="PDF 파일을 찾을 수 없음")
+    except ExtractionError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except EmptyTextError as e:
         raise HTTPException(status_code=422, detail=str(e))
 

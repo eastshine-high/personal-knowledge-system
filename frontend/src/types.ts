@@ -17,6 +17,20 @@ export interface Book {
 
 // --- 자유 대화 ---------------------------------------------------------------
 
+export interface LLMUsage {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number | null;
+}
+
+export interface ExtractionStats {
+  page_count: number;
+  elapsed_s: number;
+  backend: string;
+  cost_usd: number | null;
+}
+
 export interface Conversation {
   id: string;
   book_id: string;
@@ -25,6 +39,7 @@ export interface Conversation {
   pages_display: string;
   title: string | null;
   created_at: string;
+  extraction_stats?: ExtractionStats | null;
 }
 
 export interface Message {
@@ -38,6 +53,7 @@ export interface Message {
 export interface ChatResponse {
   conversation: Conversation;
   message: Message;
+  usage?: LLMUsage | null;
 }
 
 // --- 노트 -------------------------------------------------------------------

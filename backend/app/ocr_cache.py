@@ -18,6 +18,7 @@ from .extractor import (
     LayoutExtractor,
     PageExtraction,
 )
+from .extractors.base import ExtractionError
 
 
 @dataclass
@@ -69,6 +70,7 @@ def _dict_to_page(d: dict) -> PageExtraction:
 def _load_cached(
     db: sqlite3.Connection, pdf_file_id: str, pages: list[int]
 ) -> dict[int, PageExtraction]:
+    """DB에서 지정 페이지의 캐시된 추출 결과를 {page_num: PageExtraction} 맵으로 반환."""
     placeholders = ",".join("?" * len(pages))
     rows = db.execute(
         f"SELECT page_num, json FROM page_extractions "
@@ -94,14 +96,22 @@ def get_or_extract(
     db: sqlite3.Connection,
     target: ExtractionTarget,
     extractor: LayoutExtractor,
-) -> list[PageExtraction]:
-    """pages 순서대로 PageExtraction 반환. 캐시 미스 페이지만 extractor 호출."""
+) -> tuple[list[PageExtraction], int]:
+    """pages 순서대로 (PageExtraction 목록, 실제 추출 수) 반환. 캐시 미스 페이지만 extractor 호출.
+
+    두 번째 반환값이 0이면 전체 캐시 히트 (GPU/OCR 미호출).
+    """
     cached = _load_cached(db, target.pdf_file_id, target.pages)
     result: dict[int, PageExtraction] = dict(cached)
 
     missing = [p for p in target.pages if p not in cached]
     for page_num in missing:
-        extracted: ExtractionResult = extractor.extract(target.pdf_path, (page_num, page_num))
+        try:
+            extracted: ExtractionResult = extractor.extract(target.pdf_path, (page_num, page_num))
+        except ExtractionError:
+            raise
+        except Exception as e:
+            raise ExtractionError(f"페이지 {page_num} 추출 실패: {e}") from e
         if extracted.pages:
             pe = extracted.pages[0]
         else:
@@ -109,4 +119,4 @@ def get_or_extract(
         _save_page(db, PageCacheKey(target.pdf_file_id, page_num), pe)
         result[page_num] = pe
 
-    return [result[p] for p in target.pages if p in result]
+    return [result[p] for p in target.pages if p in result], len(missing)

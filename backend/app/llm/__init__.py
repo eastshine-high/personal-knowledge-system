@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from ..config import Settings, get_settings
-from .client import AnthropicLLMClient, LLMClient, Message, MockLLMClient
+from .client import AnthropicLLMClient, LLMClient, LLMResponse, LLMUsage, Message, MockLLMClient
 
-__all__ = ["AnthropicLLMClient", "LLMClient", "Message", "MockLLMClient", "get_llm_client"]
+__all__ = ["AnthropicLLMClient", "LLMClient", "LLMResponse", "LLMUsage", "Message", "MockLLMClient", "get_llm_client"]
 
 
 def get_llm_client(settings: Settings | None = None) -> LLMClient:

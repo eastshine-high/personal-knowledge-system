@@ -99,12 +99,14 @@ class NoteSession:
         if not targets:
             raise ValueError(f"note_id 없음: {note_id}")
         prior = self._recent_instructions()
+        guideline = self.state.get("guideline") or self.state.get("user:preferred_guideline")
         drafts = [
             (note, _refine_draft(self.client, RefineRequest(
                 note_markdown=f"TITLE: {note.title}\n\n{note.body}",
                 instruction=instruction,
                 text=self.state["source_text"],
                 history=prior,
+                guideline=guideline,
             )))
             for note in targets
         ]

@@ -52,10 +52,11 @@ class DescribeOcrCacheLayer:
         ext = _fake_extractor(calls)
 
         # When pages 1 and 2 are requested
-        pages = get_or_extract(db, _target("pdf1", [1, 2]), ext)
+        pages, extracted_count = get_or_extract(db, _target("pdf1", [1, 2]), ext)
 
         # Then the extractor was called for both pages and results are returned
         assert calls == [1, 2]
+        assert extracted_count == 2
         assert len(pages) == 2
         assert pages[0].blocks[0].text == "page1"
 
@@ -67,10 +68,11 @@ class DescribeOcrCacheLayer:
         calls.clear()
 
         # When page 1 is requested again
-        pages = get_or_extract(db, _target("pdf1", [1]), ext)
+        pages, extracted_count = get_or_extract(db, _target("pdf1", [1]), ext)
 
         # Then the extractor is not called and cached data is returned
         assert calls == []
+        assert extracted_count == 0  # full cache hit
         assert pages[0].blocks[0].text == "page1"
 
     def test_partial_cache_only_extracts_missing_pages(self, db):
@@ -81,10 +83,11 @@ class DescribeOcrCacheLayer:
         calls.clear()
 
         # When pages 1, 2, 3 are requested
-        pages = get_or_extract(db, _target("pdf1", [1, 2, 3]), ext)
+        pages, extracted_count = get_or_extract(db, _target("pdf1", [1, 2, 3]), ext)
 
         # Then only pages 2 and 3 are extracted, and all 3 are returned
         assert set(calls) == {2, 3}
+        assert extracted_count == 2
         assert len(pages) == 3
 
     def test_different_pdf_file_ids_are_isolated(self, db):
@@ -96,7 +99,7 @@ class DescribeOcrCacheLayer:
         calls.clear()
 
         # When page 1 of a different pdf_B is requested
-        get_or_extract(db, _target("pdf_B", [1], "b.pdf"), ext)
+        _, _ = get_or_extract(db, _target("pdf_B", [1], "b.pdf"), ext)
 
         # Then the extractor is called (pdf_B has no cache entry)
         assert calls == [1]
