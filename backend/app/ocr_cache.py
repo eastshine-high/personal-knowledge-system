@@ -116,7 +116,10 @@ def get_or_extract(
             pe = extracted.pages[0]
         else:
             pe = PageExtraction(page=page_num)
-        _save_page(db, PageCacheKey(target.pdf_file_id, page_num), pe)
+        try:
+            _save_page(db, PageCacheKey(target.pdf_file_id, page_num), pe)
+        except Exception as e:
+            raise ExtractionError(f"페이지 {page_num} 캐시 저장 실패: {e}") from e
         result[page_num] = pe
 
     return [result[p] for p in target.pages if p in result], len(missing)

@@ -156,6 +156,8 @@ class AnthropicLLMClient:
             kwargs["system"] = system_text
 
         resp = self._client.messages.create(**kwargs)
+        if not resp.content:
+            raise RuntimeError(f"Anthropic 응답 content가 비어 있습니다 (model={self._model})")
         usage = LLMUsage(
             model=self._model,
             input_tokens=resp.usage.input_tokens,

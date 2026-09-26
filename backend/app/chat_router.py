@@ -214,7 +214,7 @@ def create_conversation(
         raise HTTPException(status_code=422, detail=str(e))
     elapsed = time.monotonic() - t0
 
-    modal_cost = round(elapsed * _MODAL_COST_PER_S, 5) if settings.extract_backend == "modal" and newly_extracted > 0 else None
+    modal_cost = round(elapsed * _MODAL_COST_PER_S, 5) if settings.extract_backend.lower() == "modal" and newly_extracted > 0 else None
     extraction_stats = ExtractionStatsResponse(
         page_count=len(page_extractions), elapsed_s=round(elapsed, 2),
         backend=settings.extract_backend, cost_usd=modal_cost,

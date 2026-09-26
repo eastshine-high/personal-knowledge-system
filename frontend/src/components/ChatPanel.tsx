@@ -42,6 +42,7 @@ export default function ChatPanel({ conversation }: Props) {
 
   useEffect(() => {
     getMessages(conversation.id).then(setMessages).catch(() => {});
+    setUsageMap({});
   }, [conversation.id]);
 
   useEffect(() => {

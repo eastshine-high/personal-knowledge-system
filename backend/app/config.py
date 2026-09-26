@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import functools
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +44,7 @@ class Settings:
     llm_model: str              # Anthropic 모델 ID (llm_backend=anthropic 시 사용)
 
 
+@functools.lru_cache(maxsize=1)
 def get_settings() -> Settings:
     _load_env_file(_ENV_FILE)
     return Settings(
