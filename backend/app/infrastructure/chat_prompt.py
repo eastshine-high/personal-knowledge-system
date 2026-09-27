@@ -1,7 +1,7 @@
 """자유 대화 프롬프트 빌더 — 고정 컨텍스트 + 멀티턴 히스토리."""
 from __future__ import annotations
 
-from ..llm.client import Message
+from .llm_client import Message
 
 _MAX_HISTORY = 20  # 컨텍스트 초과 방지: 오래된 메시지부터 제거
 

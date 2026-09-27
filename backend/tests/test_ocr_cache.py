@@ -6,8 +6,8 @@ import sqlite3
 import pytest
 
 from app.db import init_db
-from app.extractor import Block, BBox, ExtractionResult, PageExtraction
-from app.ocr_cache import ExtractionTarget, get_or_extract
+from app.domain.extractor import Block, BBox, ExtractionResult, PageExtraction
+from app.infrastructure.ocr_cache import ExtractionTarget, get_or_extract
 
 
 @pytest.fixture

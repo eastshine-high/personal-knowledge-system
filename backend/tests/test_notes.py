@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import pytest
-from app.extractor import BBox, Block, ExtractionResult, PageExtraction
-from app.llm import MockLLMClient, get_llm_client
-from app.notes import (
+from app.domain.extractor import BBox, Block, ExtractionResult, PageExtraction
+from app.infrastructure import get_llm_client
+from app.infrastructure.mock_llm_client import MockLLMClient
+from app.domain.notes import (
     Note,
     NoteDraft,
     NoteFigure,
@@ -20,8 +21,8 @@ from app.notes import (
     refine,
     summarize,
 )
-from app.notes.models import NoteKey
-from app.notes.summarize import SummarizeRequest, RefineRequest
+from app.domain.notes.note_models import NoteKey
+from app.domain.notes.note_summarize import SummarizeRequest, RefineRequest
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +229,7 @@ class DescribeSummarize:
                 llm_model="claude-sonnet-4-6",
             )
         assert isinstance(get_llm_client(_s("mock")), MockLLMClient)
-        from app.llm.client import AnthropicLLMClient
+        from app.infrastructure.anthropic_llm_client import AnthropicLLMClient
         assert isinstance(get_llm_client(_s("anthropic")), AnthropicLLMClient)
         for stub in ("openai", "local"):
             with pytest.raises(NotImplementedError): get_llm_client(_s(stub))
@@ -278,7 +279,7 @@ class DescribeSummarize:
 
     def test_parse_draft_is_lenient_when_title_marker_absent(self):
         # Given LLM output that has no "TITLE:" prefix
-        from app.notes.summarize import _parse_draft
+        from app.domain.notes.note_summarize import _parse_draft
         d = _parse_draft("그냥 첫 줄\n둘째 줄")
 
         # Then the first line becomes the title

@@ -26,14 +26,13 @@ from ..application.chat_service import (
 )
 from ..config import Settings, get_settings
 from ..db import get_db
-from ..extractor import LayoutExtractor
-from ..extractors import get_extractor
-from ..extractors.base import ExtractionError
-from ..llm import LLMClient, get_llm_client
-from ..llm.chat_prompt import build_chat_messages
-from ..notes.prepare import PreparedContext, prepare_context
-from ..extractor import ExtractionResult
-from ..ocr_cache import ExtractionTarget, get_or_extract
+from ..domain.extractor import ExtractionResult, LayoutExtractor
+from ..infrastructure import get_llm_client
+from ..infrastructure.chat_prompt import build_chat_messages
+from ..infrastructure.extractors import ExtractionError, get_extractor
+from ..infrastructure.llm_client import LLMClient
+from ..infrastructure.ocr_cache import ExtractionTarget, get_or_extract
+from ..domain.notes.note_prepare import PreparedContext, prepare_context
 from ..pages import format_pages, parse_pages
 from ..schemas import (
     ChatResponse,

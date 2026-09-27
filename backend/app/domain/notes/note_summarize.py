@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ...llm import LLMClient, Message
+from ...infrastructure.llm_client import LLMClient, Message
 from .note_models import NoteDraft
 
 _SYSTEM = (

@@ -13,13 +13,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from ..config import get_settings
-from ..extractor import LayoutExtractor
-from ..extractors import get_extractor
-from ..extractors.base import ExtractionError
-from ..llm import LLMClient, get_llm_client
-from ..notes import EmptyTextError, NoteSession, build_session
-from ..notes.models import Note
-from ..notes.orchestrate import BuildSessionRequest
+from ..domain.extractor import LayoutExtractor
+from ..domain.notes import EmptyTextError, NoteSession, build_session
+from ..domain.notes.note_models import Note
+from ..domain.notes.note_orchestrate import BuildSessionRequest
+from ..infrastructure import get_llm_client
+from ..infrastructure.extractors import ExtractionError, get_extractor
+from ..infrastructure.llm_client import LLMClient
 from ..infrastructure.note_session_store import _sessions, get_session, put_session
 from ..schemas import (
     CreateSessionRequest,

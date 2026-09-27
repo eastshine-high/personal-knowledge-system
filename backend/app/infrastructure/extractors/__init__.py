@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ...config import Settings, get_settings
-from ...extractor import LayoutExtractor
+from ...domain.extractor import LayoutExtractor
 from .base_extractor import ExtractionError
 from .fixture_extractor import FixtureLayoutExtractor
 from .modal_extractor import ModalLayoutExtractor
@@ -23,7 +23,7 @@ def get_extractor(settings: Settings | None = None) -> LayoutExtractor:
     if s.extract_backend == "fixture":
         return FixtureLayoutExtractor.from_settings(s)
     if s.extract_backend == "stub":
-        from ...extractor import StubLayoutExtractor
+        from ...domain.extractor import StubLayoutExtractor
 
         return StubLayoutExtractor()
     if s.extract_backend == "local":

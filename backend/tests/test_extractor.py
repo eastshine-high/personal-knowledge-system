@@ -8,14 +8,14 @@ import pymupdf
 import pytest
 
 from app import config
-from app.extractor import BlockType, StubLayoutExtractor, normalize_label
-from app.extractors import (
+from app.domain.extractor import BlockType, StubLayoutExtractor, normalize_label
+from app.infrastructure.extractors import (
     ExtractionError,
     FixtureLayoutExtractor,
     ModalLayoutExtractor,
     get_extractor,
 )
-from app.extractors.modal_extractor import ModalExtractorConfig
+from app.infrastructure.extractors.modal_extractor import ModalExtractorConfig
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ class DescribeErrorHandlingAndRetry:
 
     def test_non_200_response_raises_extraction_error(self, monkeypatch):
         # Given the endpoint returns 500
-        from app.extractors import modal_extractor
+        from app.infrastructure.extractors import modal_extractor
         monkeypatch.setattr(modal_extractor.httpx, "post", lambda *a, **k: _FakeResp(500))
 
         # Then ExtractionError is raised
@@ -223,7 +223,7 @@ class DescribeErrorHandlingAndRetry:
 
     def test_network_error_raises_extraction_error(self, monkeypatch):
         # Given a network failure
-        from app.extractors import modal_extractor
+        from app.infrastructure.extractors import modal_extractor
         monkeypatch.setattr(modal_extractor.httpx, "post", lambda *a, **k: (_ for _ in ()).throw(modal_extractor.httpx.ConnectError("no route")))
 
         # Then ExtractionError is raised
@@ -232,7 +232,7 @@ class DescribeErrorHandlingAndRetry:
 
     def test_transient_500_is_retried_and_succeeds_on_second_attempt(self, monkeypatch):
         # Given the first call returns 500 (transient) and the second returns 200
-        from app.extractors import modal_extractor
+        from app.infrastructure.extractors import modal_extractor
         calls = {"n": 0}
         def flaky(*a, **k):
             calls["n"] += 1
@@ -250,7 +250,7 @@ class DescribeErrorHandlingAndRetry:
 
     def test_retries_exhausted_raises_after_max_attempts(self, monkeypatch):
         # Given the endpoint always returns 500
-        from app.extractors import modal_extractor
+        from app.infrastructure.extractors import modal_extractor
         calls = {"n": 0}
         def always_500(*a, **k):
             calls["n"] += 1
@@ -265,7 +265,7 @@ class DescribeErrorHandlingAndRetry:
 
     def test_4xx_error_is_not_retried(self, monkeypatch):
         # Given the endpoint returns 401 (permanent error)
-        from app.extractors import modal_extractor
+        from app.infrastructure.extractors import modal_extractor
         calls = {"n": 0}
         def unauthorized(*a, **k):
             calls["n"] += 1
@@ -305,7 +305,7 @@ class DescribeWarmup:
 
     def test_pings_health_endpoint_before_first_extract(self, tiny_pdf, tmp_path, monkeypatch):
         # Given warmup=True and a healthy endpoint
-        from app.extractors import modal_extractor
+        from app.infrastructure.extractors import modal_extractor
         calls = {"health": 0}
         def fake_get(url, **k):
             calls["health"] += 1
@@ -326,7 +326,7 @@ class DescribeWarmup:
 
     def test_warmup_disabled_skips_health_ping(self, tiny_pdf, tmp_path, monkeypatch):
         # Given warmup=False
-        from app.extractors import modal_extractor
+        from app.infrastructure.extractors import modal_extractor
         monkeypatch.setattr(modal_extractor.httpx, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("warmup=False인데 /health 호출됨")))
 
         # Then health is never pinged

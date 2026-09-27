@@ -5,8 +5,8 @@ import app.db as db_mod
 import pytest
 from fastapi.testclient import TestClient
 
-from app.extractor import ExtractionResult, PageExtraction, Block, BBox
-from app.llm import get_llm_client
+from app.domain.extractor import ExtractionResult, PageExtraction, Block, BBox
+from app.infrastructure import get_llm_client
 from app.config import get_settings
 
 

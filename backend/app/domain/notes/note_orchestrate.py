@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...extractors import get_extractor
+from ...infrastructure.extractors import get_extractor
 from ..extractor import ExtractionResult, LayoutExtractor
-from ...llm import LLMClient, get_llm_client
+from ...infrastructure.llm_client import LLMClient
+from ...infrastructure import get_llm_client
 from .note_prepare import prepare_context
 from .note_session import NoteSession, SessionConfig
 

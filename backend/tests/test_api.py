@@ -9,9 +9,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.presentation.notes_router import _extractor_dep, _llm_dep
-from app.extractor import BBox, Block, ExtractionResult, PageExtraction
+from app.domain.extractor import BBox, Block, ExtractionResult, PageExtraction
 from app.config import get_settings
-from app.llm.client import MockLLMClient
+from app.infrastructure.mock_llm_client import MockLLMClient
 from app.main import app
 
 

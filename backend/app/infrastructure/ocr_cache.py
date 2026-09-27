@@ -11,14 +11,14 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from ..extractor import (
+from ..domain.extractor import (
     BBox,
     Block,
     ExtractionResult,
     LayoutExtractor,
     PageExtraction,
 )
-from ..extractors.base import ExtractionError
+from .extractors.base_extractor import ExtractionError
 
 
 @dataclass

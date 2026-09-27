@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pymupdf
 
-from ...extractor import (
+from ...domain.extractor import (
     BBox,
     Block,
     ExtractionResult,

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json as _json
 
-from ..llm import LLMUsage
+from ..infrastructure.llm_client import LLMUsage
 from ..schemas import LLMUsageResponse
 
 _HMARKER = "\n\n[HIGHLIGHTS_JSON]"

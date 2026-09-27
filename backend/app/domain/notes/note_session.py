@@ -13,7 +13,7 @@ import copy
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ...llm import LLMClient
+from ...infrastructure.llm_client import LLMClient
 from .note_models import Note, NoteFigure, NoteKey, SessionEvent, make_note_id
 from .note_prepare import PreparedContext
 from .note_summarize import RefineRequest, SummarizeRequest

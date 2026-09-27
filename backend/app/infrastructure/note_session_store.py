@@ -1,7 +1,7 @@
 """인메모리 노트 세션 스토어 — session_id → (NoteSession, pdf_path) 레지스트리."""
 from __future__ import annotations
 
-from ..notes import NoteSession
+from ..domain.notes import NoteSession
 
 # 인메모리 세션 스토어: session_id → (NoteSession, pdf_path)
 _sessions: dict[str, tuple[NoteSession, str]] = {}
