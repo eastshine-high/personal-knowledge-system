@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from .llm_client import LLMResponse, LLMUsage, Message
 
+_MAX_OUTPUT_TOKENS = 4096
+
 
 class AnthropicLLMClient:
     """실 Anthropic Claude 클라이언트.
@@ -11,20 +13,19 @@ class AnthropicLLMClient:
     system 역할 메시지는 Anthropic API의 최상위 system 파라미터로 분리해 전달한다.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-6", max_tokens: int = 4096) -> None:
+    def __init__(self, model: str = "claude-sonnet-4-6") -> None:
         try:
             import anthropic as _anthropic
         except ImportError as exc:
             raise ImportError("pip install anthropic") from exc
         self._client = _anthropic.Anthropic()  # ANTHROPIC_API_KEY 환경변수 자동 사용
         self._model = model
-        self._max_tokens = max_tokens
 
     def complete(self, messages: list[Message]) -> LLMResponse:
         system_text = "\n\n".join(m.content for m in messages if m.role == "system")
         chat = [{"role": m.role, "content": m.content} for m in messages if m.role != "system"]
 
-        kwargs: dict = dict(model=self._model, max_tokens=self._max_tokens, messages=chat)
+        kwargs: dict = dict(model=self._model, max_tokens=_MAX_OUTPUT_TOKENS, messages=chat)
         if system_text:
             kwargs["system"] = system_text
 
