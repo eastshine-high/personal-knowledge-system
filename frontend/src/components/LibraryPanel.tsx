@@ -107,8 +107,12 @@ export default function LibraryPanel({ selectedPdfId, onSelectPdf }: Props) {
                     key={pf.id}
                     style={pf.id === selectedPdfId ? s.pdfItemSelected : s.pdfItem}
                     onClick={() => onSelectPdf(pf, book)}
+                    title={pf.pdf_path}
                   >
-                    <span style={s.pdfLabel}>{pf.label}</span>
+                    <span style={s.pdfLabelCol}>
+                      <span style={s.pdfLabel}>{pf.label}</span>
+                      <span style={s.pdfPath}>{pf.pdf_path}</span>
+                    </span>
                     <button
                       style={s.deleteBtn}
                       onClick={(e) => { e.stopPropagation(); removePdf(book.id, pf.id); }}
@@ -175,7 +179,9 @@ const s: Record<string, React.CSSProperties> = {
     padding: "4px 6px", borderRadius: 4, cursor: "pointer", fontSize: 12,
     background: "#e3f2fd", color: "#1565c0", fontWeight: 600,
   },
-  pdfLabel: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
+  pdfLabelCol: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" as const },
+  pdfLabel: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
+  pdfPath: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, fontSize: 10, color: "#999" },
   deleteBtn: { background: "none", border: "none", cursor: "pointer", color: "#bbb", fontSize: 11, padding: 0 },
   addPdfBtn: {
     background: "none", border: "1px dashed #ccc", borderRadius: 4,
