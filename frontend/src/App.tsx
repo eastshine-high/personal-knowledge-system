@@ -23,6 +23,8 @@ export default function App() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [newConv, setNewConv] = useState<Conversation | null>(null);
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(220);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
 
   useEffect(() => {
     if (!showNoteModal) return;
@@ -32,6 +34,20 @@ export default function App() {
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [showNoteModal]);
+
+  useEffect(() => {
+    if (!isResizingSidebar) return;
+    const handleMove = (e: MouseEvent) => {
+      setSidebarWidth(Math.min(480, Math.max(160, e.clientX)));
+    };
+    const handleUp = () => setIsResizingSidebar(false);
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleUp);
+    };
+  }, [isResizingSidebar]);
 
   const handleSelectPdf = (pdf: PdfFile, book: Book) => {
     setSelectedPdf({ pdf, book });
@@ -71,9 +87,13 @@ export default function App() {
   return (
     <main style={s.workspace}>
       {/* 좌측 서재 패널 */}
-      <aside style={s.sidebar}>
+      <aside style={{ ...s.sidebar, width: sidebarWidth }}>
         <LibraryPanel selectedPdfId={selectedPdf?.pdf.id ?? null} onSelectPdf={handleSelectPdf} />
       </aside>
+      <div
+        style={s.resizeHandle}
+        onMouseDown={() => setIsResizingSidebar(true)}
+      />
 
       {/* 우측 메인 영역 */}
       <section style={s.main}>
@@ -182,7 +202,8 @@ export default function App() {
 
 const s: Record<string, React.CSSProperties> = {
   workspace: { display: "flex", height: "100vh", fontFamily: "sans-serif", background: "#fafafa" },
-  sidebar: { width: 220, borderRight: "1px solid #e0e0e0", background: "#fff", flexShrink: 0 },
+  sidebar: { background: "#fff", flexShrink: 0, overflow: "hidden" },
+  resizeHandle: { width: 5, marginLeft: -2, flexShrink: 0, cursor: "col-resize", background: "transparent", borderRight: "1px solid #e0e0e0" },
   main: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" },
   topBar: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
