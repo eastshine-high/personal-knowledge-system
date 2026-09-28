@@ -5,7 +5,7 @@
 ## 기술 스택 (1차 모듈)
 - **백엔드**: Python + FastAPI (`backend/`)
 - **프런트엔드**: React + Vite (`frontend/`)
-- **문서 레이아웃 추출**: PaddleOCR-VL(오픈웨이트) — 서버리스 GPU에서 시작, 장비 확보 시 로컬. `backend/app/extractor.py`의 `LayoutExtractor` 인터페이스로 교체
+- **문서 레이아웃 추출**: PaddleOCR-VL(오픈웨이트) — 서버리스 GPU에서 시작, 장비 확보 시 로컬. `backend/app/domain/extractor.py`의 `LayoutExtractor` 인터페이스로 교체
 - **요약 LLM**: Anthropic Claude (텍스트만 전송; **이미지·원문은 외부 미전송**). 1차 단일 모델
 - **문서 소스**: 스캔+OCR PDF (1차), Obsidian vault (추후)
 - **테스트**: pytest (`backend/`) + Playwright (`frontend/` 웹 UI E2E)
@@ -88,22 +88,28 @@ npm run test:e2e:headed   # 브라우저 보면서 실행
 - 외부 API는 `page.route()`로 mock — 재현성 ↑, 비용 0
 - `/evaluate` subagent가 자동으로 `npm run test:e2e` 실행 + `test-results.json` 파싱
 
-### 백엔드 아키텍처 — DDD 레이어드 아키텍처 (`backend/app/`)
+### 백엔드 아키텍처
 
-4개 레이어로 구성. 의존 방향: `presentation → application → domain ← infrastructure`
+DDD 레이어드 아키텍처 적용. 상세 구조·파일 목록·설계 결정 이력은 [`docs/architecture.md`](../docs/architecture.md) 참조.
 
-```
-backend/app/
-├── presentation/    # HTTP 핸들러 · DI · 스키마 변환만. FastAPI 허용
-├── application/     # 유스케이스 · DB 쿼리. FastAPI import 금지
-├── domain/          # 순수 모델 · 인터페이스. 외부 라이브러리 의존 금지
-├── infrastructure/  # 외부 시스템 구현체 (LLM, OCR, DB 캐시)
-└── schemas/         # 공용 Pydantic DTO. __init__.py에서 전체 re-export
-```
+의존 방향: `presentation → application → domain ← infrastructure`
 
 - **레이어 규칙**: `presentation/`은 `application/`을 호출. `application/`은 `fastapi` import 불가.
 - **파일 명명**: 디렉토리 없이 파일명만 봐도 역할이 명확해야 한다 (예: `chat_service.py`, `library_repository.py`, `mock_llm_client.py`).
 - **테스트 DI**: `dependency_overrides`용 함수는 `presentation/` 레이어에서 import.
+
+### 프로젝트 구조 문서 갱신 규칙
+
+코드 작업 중 아래 변화가 생기면 **같은 커밋에서** CLAUDE.md의 관련 섹션을 함께 갱신한다.
+
+| 변화 종류 | 갱신 대상 |
+|----------|----------|
+| 파일/디렉토리 추가·이동·삭제 | `docs/architecture.md` 파일 트리 + `기술 스택` 경로 참조 |
+| 새 레이어·모듈 도입 | `docs/architecture.md` 레이어 설명 + 설계 결정 이력 |
+| 도메인 용어 추가·변경 | `도메인 용어` 테이블 |
+| 빌드/실행 명령 변경 | `빌드 / 실행` 섹션 |
+
+> 코드는 최신인데 CLAUDE.md가 구버전을 가리키면, 다음 세션의 AI가 잘못된 경로를 참조하게 된다.
 
 ### 백엔드 코딩 컨벤션 (`backend/`)
 
