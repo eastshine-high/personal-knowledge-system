@@ -99,7 +99,18 @@ export default function App() {
       <section style={s.main}>
         {/* 상단 바 */}
         <div style={s.topBar}>
-          <span style={s.appTitle}>PKS</span>
+          <div style={s.topBarLeft}>
+            <span style={s.appTitle}>PKS</span>
+            {selectedPdf && (
+              <div style={s.pdfBreadcrumb}>
+                <span style={s.pdfBreadcrumbBook}>{selectedPdf.book.title}</span>
+                <span style={s.pdfBreadcrumbSep}>·</span>
+                <span style={s.pdfBreadcrumbLabel}>{selectedPdf.pdf.label}</span>
+                <span style={s.pdfBreadcrumbSep}>·</span>
+                <span style={s.pdfBreadcrumbPath}>{selectedPdf.pdf.pdf_path}</span>
+              </div>
+            )}
+          </div>
           <button data-testid="open-note-modal-btn" style={s.noteBtn} onClick={() => setShowNoteModal(true)}>
             노트 생성
           </button>
@@ -208,8 +219,15 @@ const s: Record<string, React.CSSProperties> = {
   topBar: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
     padding: "10px 16px", borderBottom: "1px solid #e0e0e0", background: "#fff",
+    minWidth: 0,
   },
-  appTitle: { fontSize: 15, fontWeight: 700, color: "#1a1a1a" },
+  topBarLeft: { display: "flex", alignItems: "baseline", gap: 12, minWidth: 0, overflow: "hidden" },
+  appTitle: { fontSize: 15, fontWeight: 700, color: "#1a1a1a", flexShrink: 0 },
+  pdfBreadcrumb: { display: "flex", alignItems: "baseline", gap: 5, minWidth: 0, overflow: "hidden" },
+  pdfBreadcrumbBook: { fontSize: 12, fontWeight: 600, color: "#555", flexShrink: 0 },
+  pdfBreadcrumbSep: { fontSize: 11, color: "#ccc", flexShrink: 0 },
+  pdfBreadcrumbLabel: { fontSize: 12, color: "#777", flexShrink: 0 },
+  pdfBreadcrumbPath: { fontSize: 11, color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
   noteBtn: {
     padding: "6px 14px", background: "#1a1a1a", color: "#fff",
     border: "none", borderRadius: 4, fontSize: 13, cursor: "pointer",
