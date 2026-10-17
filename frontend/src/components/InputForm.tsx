@@ -19,6 +19,7 @@ export default function InputForm({ onSessionCreated }: Props) {
   const [topic, setTopic] = useState("");
   const [guideline, setGuideline] = useState("");
   const [noteCount, setNoteCount] = useState(1);
+  const [useHighlights, setUseHighlights] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export default function InputForm({ onSessionCreated }: Props) {
         topic,
         guideline: guideline || undefined,
         note_count: noteCount,
+        use_highlights: useHighlights,
       });
       onSessionCreated(session);
     } catch (err) {
@@ -132,6 +134,17 @@ export default function InputForm({ onSessionCreated }: Props) {
         />
       </label>
 
+      <label style={styles.checkLabel}>
+        <input
+          type="checkbox"
+          checked={useHighlights}
+          onChange={(e) => setUseHighlights(e.target.checked)}
+          disabled={loading}
+          style={styles.checkbox}
+        />
+        형광펜 가중치 포함
+      </label>
+
       {error && <p style={styles.error}>{error}</p>}
 
       <button style={loading ? styles.buttonDisabled : styles.button} type="submit" disabled={loading}>
@@ -170,6 +183,8 @@ const styles: Record<string, React.CSSProperties> = {
     outline: "none",
   },
   row: { display: "flex", gap: 12 },
+  checkLabel: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#555", cursor: "pointer", userSelect: "none" },
+  checkbox: { margin: 0, cursor: "pointer" },
   error: { margin: 0, fontSize: 13, color: "#d32f2f" },
   status: { margin: 0, fontSize: 13, color: "#555", textAlign: "center" as const },
   button: {

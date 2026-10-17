@@ -29,6 +29,7 @@ export function createSession(params: {
   guideline?: string;
   note_count?: number;
   user_preferred_guideline?: string;
+  use_highlights?: boolean;
 }): Promise<SessionResponse> {
   return request("/sessions", { method: "POST", body: JSON.stringify(params) });
 }
