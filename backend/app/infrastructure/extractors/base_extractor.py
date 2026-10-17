@@ -13,19 +13,21 @@ from ...domain.extractor import (
     BBox,
     Block,
     ExtractionResult,
+    Highlight,
     PageExtraction,
     normalize_label,
 )
 
 
-def _dedup_ordered(items: list[str]) -> list[str]:
-    """순서를 유지하며 중복을 제거한 새 리스트 반환."""
-    seen: set[str] = set()
-    out: list[str] = []
-    for t in items:
-        if t not in seen:
-            seen.add(t)
-            out.append(t)
+def _dedup_highlights(items: list[Highlight]) -> list[Highlight]:
+    """순서를 유지하며 (text, color) 기준 중복을 제거한 새 리스트 반환."""
+    seen: set[tuple[str, str]] = set()
+    out: list[Highlight] = []
+    for h in items:
+        key = (h.text, h.color)
+        if key not in seen:
+            seen.add(key)
+            out.append(h)
     return out
 
 
@@ -98,13 +100,15 @@ class BaseLayoutExtractor:
             image_ref=image_ref,
         )
 
-    def _extract_highlights(self, page: "pymupdf.Page", blocks: "list[Block]") -> "list[str]":
+    def _extract_highlights(self, page: "pymupdf.Page", blocks: "list[Block]") -> "list[Highlight]":
         """PDF 형광 표시(highlight) 주석에서 텍스트를 수집한다.
 
         1차: 페이지 텍스트 레이어에서 추출 (대부분의 GoodNotes PDF)
         폴백: annotation rect를 render 픽셀로 변환해 OCR 블록과 매핑 (스캔 전용 PDF)
+
+        평탄화(주석 없음) 형광펜의 색 검출은 _assemble_page에서 합류한다.
         """
-        results: list[str] = []
+        results: list[Highlight] = []
         for annot in page.annots() or []:
             if annot.type[0] != pymupdf.PDF_ANNOT_HIGHLIGHT:
                 continue
@@ -115,8 +119,8 @@ class BaseLayoutExtractor:
                 px_rect = pymupdf.Rect(r.x0 * sx, r.y0 * sx, r.x1 * sx, r.y1 * sx)
                 text = self._blocks_in_rect(px_rect, blocks)
             if text:
-                results.append(text)
-        return _dedup_ordered(results)
+                results.append(Highlight(text=text, color="other"))
+        return _dedup_highlights(results)
 
     def _blocks_in_rect(self, rect: "pymupdf.Rect", blocks: "list[Block]") -> str:
         """annotation bbox(render 픽셀)와 50% 이상 겹치는 텍스트 블록을 이어붙여 반환."""

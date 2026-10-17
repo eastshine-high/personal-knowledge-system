@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ...infrastructure.extractors import get_extractor
-from ..extractor import ExtractionResult, LayoutExtractor
+from ..extractor import ExtractionResult, Highlight, LayoutExtractor
 from ...infrastructure.llm_client import LLMClient
 from ...infrastructure import get_llm_client
 from .note_prepare import prepare_context
@@ -28,14 +28,15 @@ class BuildSessionRequest:
     user_preferred_guideline: str | None = None
 
 
-def _collect_highlights(result: ExtractionResult) -> list[str]:
-    """ExtractionResult에서 중복 없는 형광 표시 텍스트를 수집. 순서 유지."""
-    seen: set[str] = set()
-    out: list[str] = []
+def _collect_highlights(result: ExtractionResult) -> list[Highlight]:
+    """ExtractionResult에서 중복 없는 형광 표시를 수집. 순서 유지((text,color) 기준)."""
+    seen: set[tuple[str, str]] = set()
+    out: list[Highlight] = []
     for pe in result.pages:
         for h in pe.highlights:
-            if h not in seen:
-                seen.add(h)
+            key = (h.text, h.color)
+            if key not in seen:
+                seen.add(key)
                 out.append(h)
     return out
 

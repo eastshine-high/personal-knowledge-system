@@ -407,7 +407,7 @@ class DescribeHighlightExtraction:
 
         # Then the highlighted text is captured
         assert len(res.pages[0].highlights) == 1
-        assert "Important" in res.pages[0].highlights[0]
+        assert "Important" in res.pages[0].highlights[0].text
 
     def test_no_annotation_yields_empty_highlights(self, tiny_pdf, tmp_path):
         # Given a PDF with no annotations
@@ -433,4 +433,5 @@ class DescribeHighlightExtraction:
         res = ext.extract(no_text_highlighted_pdf, (1, 1))
 
         # Then the OCR text from the overlapping block is used as the highlight
-        assert res.pages[0].highlights == ["OCR 폴백 텍스트"]
+        assert [h.text for h in res.pages[0].highlights] == ["OCR 폴백 텍스트"]
+        assert res.pages[0].highlights[0].color == "other"  # 주석 경로는 색 미분류

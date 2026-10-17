@@ -15,6 +15,7 @@ from ..domain.extractor import (
     BBox,
     Block,
     ExtractionResult,
+    Highlight,
     LayoutExtractor,
     PageExtraction,
 )
@@ -44,6 +45,13 @@ def _page_to_dict(pe: PageExtraction) -> dict:
     return dataclasses.asdict(pe)
 
 
+def _dict_to_highlight(h) -> Highlight:
+    """캐시 JSON의 highlight 항목을 Highlight로 복원. 구버전(str)과 신버전(dict) 모두 수용."""
+    if isinstance(h, str):
+        return Highlight(text=h, color="other")  # 하위 호환: 과거 캐시는 문자열
+    return Highlight(text=h["text"], color=h.get("color", "other"))
+
+
 def _dict_to_page(d: dict) -> PageExtraction:
     blocks = [
         Block(
@@ -61,7 +69,7 @@ def _dict_to_page(d: dict) -> PageExtraction:
         height_px=d["height_px"],
         render_dpi=d["render_dpi"],
         blocks=blocks,
-        highlights=d.get("highlights", []),
+        highlights=[_dict_to_highlight(h) for h in d.get("highlights", [])],
     )
 
 

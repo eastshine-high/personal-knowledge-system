@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ...infrastructure.llm_client import LLMClient, Message
+from ..extractor import Highlight
 from .note_models import NoteDraft
 
 _SYSTEM = (
@@ -28,7 +29,7 @@ class SummarizeRequest:
     topic: str
     guideline: str | None = None
     note_count: int = 1
-    highlights: list[str] | None = None
+    highlights: list[Highlight] | None = None
 
 
 @dataclass
@@ -59,7 +60,7 @@ def _build_summarize_prompt(req: SummarizeRequest, aspect: str) -> str:
             "다음은 독자가 이 페이지에서 중요하다고 표시한 구절입니다.",
             "요약은 이 독자의 이해 방식을 반영해야 합니다:",
         ]
-        lines += [f"- {h}" for h in req.highlights]
+        lines += [f"- {h.text}" for h in req.highlights]
     return "\n".join(lines)
 
 

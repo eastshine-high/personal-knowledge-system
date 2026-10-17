@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json as _json
 
+from ..domain.extractor import Highlight
 from ..infrastructure.llm_client import LLMUsage
 from ..schemas import LLMUsageResponse
 
@@ -10,16 +11,17 @@ _HMARKER = "\n\n[HIGHLIGHTS_JSON]"
 _MODAL_COST_PER_S = 0.000211  # Modal A10G GPU 추정 요금 ($/s)
 
 
-def collect_page_highlights(page_extractions, use_highlights: bool) -> list[str]:
-    """use_highlights=True일 때만 페이지 추출물에서 중복 없는 형광 텍스트 수집."""
+def collect_page_highlights(page_extractions, use_highlights: bool) -> list[Highlight]:
+    """use_highlights=True일 때만 페이지 추출물에서 중복 없는 형광 표시 수집((text,color) 기준)."""
     if not use_highlights:
         return []
-    seen: set[str] = set()
-    out: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    out: list[Highlight] = []
     for pe in page_extractions:
         for h in pe.highlights:
-            if h not in seen:
-                seen.add(h)
+            key = (h.text, h.color)
+            if key not in seen:
+                seen.add(key)
                 out.append(h)
     return out
 
@@ -37,8 +39,12 @@ def build_usage_response(usage: LLMUsage | None) -> LLMUsageResponse | None:
     )
 
 
-def build_sys_content(context_text: str, highlights: list[str]) -> str:
-    """context_text + (선택) highlights를 시스템 메시지 content로 조립."""
+def build_sys_content(context_text: str, highlights: list[Highlight]) -> str:
+    """context_text + (선택) highlights를 시스템 메시지 content로 조립.
+
+    현재 [HIGHLIGHTS_JSON]은 텍스트 목록으로 직렬화(색/가중치 반영은 후속 작업).
+    """
     if highlights:
-        return context_text + _HMARKER + _json.dumps(highlights, ensure_ascii=False)
+        texts = [h.text for h in highlights]
+        return context_text + _HMARKER + _json.dumps(texts, ensure_ascii=False)
     return context_text

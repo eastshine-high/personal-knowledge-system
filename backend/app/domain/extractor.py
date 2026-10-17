@@ -77,6 +77,10 @@ class BBox:
     y1: float
 
 
+# 형광 표시 색상 — 평탄화(픽셀) 검출 색 분류 + 주석 경로의 미분류는 "other".
+HighlightColor = Literal["yellow", "green", "other"]
+
+
 @dataclass
 class Block:
     """검출된 레이아웃 블록 하나."""
@@ -89,13 +93,24 @@ class Block:
 
 
 @dataclass
+class Highlight:
+    """독자의 형광 표시 한 건 — 표시된 텍스트 + 색상.
+
+    색상은 소비 시 가중치로 환산한다(가중치는 모델에 박지 않음 → 설정 변경이 과거 데이터에 비소급).
+    """
+
+    text: str
+    color: HighlightColor = "other"
+
+
+@dataclass
 class PageExtraction:
     page: int
     width_px: int = 0        # 렌더된 페이지 이미지 폭(px) — bbox 좌표계 기준
     height_px: int = 0       # 렌더된 페이지 이미지 높이(px)
     render_dpi: int = 200    # bbox 좌표를 만든 렌더 DPI (스파이크 기준 200)
     blocks: list[Block] = field(default_factory=list)
-    highlights: list[str] = field(default_factory=list)  # 독자 형광 표시 텍스트 (읽기 순서, 중복 제거)
+    highlights: list[Highlight] = field(default_factory=list)  # 독자 형광 표시 (읽기 순서, 중복 제거)
 
 
 @dataclass

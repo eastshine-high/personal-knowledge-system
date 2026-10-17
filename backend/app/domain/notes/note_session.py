@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ...infrastructure.llm_client import LLMClient
+from ..extractor import Highlight
 from .note_models import Note, NoteFigure, NoteKey, SessionEvent, make_note_id
 from .note_prepare import PreparedContext
 from .note_summarize import RefineRequest, SummarizeRequest
@@ -35,7 +36,7 @@ class SessionConfig:
     created: str
     guideline: str | None = None
     user_preferred_guideline: str | None = None
-    highlights: list[str] | None = None
+    highlights: list[Highlight] | None = None
 
 
 def _make_initial_state(context: PreparedContext, config: SessionConfig) -> dict:
