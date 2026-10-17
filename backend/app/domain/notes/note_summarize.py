@@ -30,6 +30,7 @@ class SummarizeRequest:
     guideline: str | None = None
     note_count: int = 1
     highlights: list[Highlight] | None = None
+    highlight_weights: dict[str, float] | None = None  # 색상→가중치(주입식). None이면 평면 나열
 
 
 @dataclass
@@ -41,6 +42,21 @@ class RefineRequest:
     text: str
     history: list[str] | None = None
     guideline: str | None = None
+
+
+def _focus_lines(highlights: list[Highlight], weights: dict[str, float] | None) -> list[str]:
+    """형광 구절을 가중치 2그룹(가장 중요/중요)으로. 가중치 없거나 단일이면 평면 나열."""
+    if not weights:
+        return [f"- {h.text}" for h in highlights]
+    weighted = [(h, weights.get(h.color, 1.0)) for h in highlights]
+    if len({w for _, w in weighted}) < 2:
+        return [f"- {h.text}" for h in highlights]
+    top = max(w for _, w in weighted)
+    lines = ["[가장 중요 — 특히 강조한 구절]"]
+    lines += [f"- {h.text}" for h, w in weighted if w == top]
+    lines += ["[중요 — 표시한 구절]"]
+    lines += [f"- {h.text}" for h, w in weighted if w != top]
+    return lines
 
 
 def _build_summarize_prompt(req: SummarizeRequest, aspect: str) -> str:
@@ -60,7 +76,7 @@ def _build_summarize_prompt(req: SummarizeRequest, aspect: str) -> str:
             "다음은 독자가 이 페이지에서 중요하다고 표시한 구절입니다.",
             "요약은 이 독자의 이해 방식을 반영해야 합니다:",
         ]
-        lines += [f"- {h.text}" for h in req.highlights]
+        lines += _focus_lines(req.highlights, req.highlight_weights)
     return "\n".join(lines)
 
 

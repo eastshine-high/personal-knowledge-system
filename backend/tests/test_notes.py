@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import pytest
-from app.domain.extractor import BBox, Block, ExtractionResult, PageExtraction
+from app.domain.extractor import BBox, Block, ExtractionResult, Highlight, PageExtraction
 from app.infrastructure import get_llm_client
 from app.infrastructure.mock_llm_client import MockLLMClient
 from app.domain.notes import (
@@ -227,6 +227,7 @@ class DescribeSummarize:
                 render_dpi=200, request_timeout_s=5, crop_dir="/tmp", max_retries=0,
                 retry_backoff_s=0, warmup=False, fixtures_dir="/tmp", llm_backend=backend,
                 llm_model="claude-sonnet-4-6",
+                highlight_color_weights={"green": 2.0, "yellow": 1.0, "other": 1.0},
             )
         assert isinstance(get_llm_client(_s("mock")), MockLLMClient)
         from app.infrastructure.anthropic_llm_client import AnthropicLLMClient
@@ -523,6 +524,67 @@ class DescribeBuildSession:
                 BuildSessionRequest(pdf_path="x.pdf", page_range=(1, 1), topic="t", created="2026-09-02"),
                 extractor=_FakeExtractor(res), client=MockLLMClient(),
             )
+
+
+_WEIGHTS = {"green": 2.0, "yellow": 1.0, "other": 1.0}
+
+
+class DescribeHighlightWeighting:
+    """형광 가중치 프롬프트 반영 + use_highlights 토글 동작 명세."""
+
+    def _build(self, highlights, *, use_highlights):
+        res = _result({1: [_blk("text", 100, "본문")]})
+        res.pages[0].highlights = highlights
+        spy = _SpyLLMClient()
+        build_session(
+            BuildSessionRequest(
+                pdf_path="x.pdf", page_range=(1, 1), topic="t", created="2026-09-02",
+                use_highlights=use_highlights, highlight_weights=_WEIGHTS,
+            ),
+            extractor=_FakeExtractor(res), client=spy,
+        )
+        return spy.all_content()
+
+    def test_green_is_grouped_above_yellow_in_prompt(self):
+        # Given green + yellow highlights with green weighted higher
+        from app.domain.notes.note_summarize import SummarizeRequest, _build_summarize_prompt
+        req = SummarizeRequest(
+            text="t", topic="x",
+            highlights=[Highlight("노랑구절", "yellow"), Highlight("초록구절", "green")],
+            highlight_weights=_WEIGHTS,
+        )
+        # When the prompt is built
+        prompt = _build_summarize_prompt(req, "1/1")
+        # Then green sits under '가장 중요' and yellow under '중요'
+        assert "[가장 중요" in prompt
+        assert prompt.index("초록구절") < prompt.index("[중요") < prompt.index("노랑구절")
+
+    def test_toggle_off_excludes_reader_focus(self):
+        # Given highlights exist but use_highlights is False
+        content = self._build([Highlight("강조구절", "green")], use_highlights=False)
+        # Then the summary prompt carries no [READER_FOCUS]
+        assert "[READER_FOCUS]" not in content
+        assert "강조구절" not in content
+
+    def test_toggle_on_includes_reader_focus_with_green_priority(self):
+        # Given highlights and use_highlights True
+        content = self._build(
+            [Highlight("노랑구절", "yellow"), Highlight("초록구절", "green")], use_highlights=True,
+        )
+        # Then [READER_FOCUS] appears and green outranks yellow
+        assert "[READER_FOCUS]" in content
+        assert content.index("초록구절") < content.index("[중요") < content.index("노랑구절")
+
+    def test_highlight_weight_env_override(self, monkeypatch):
+        # Given an env override for yellow weight
+        from app import config
+        monkeypatch.setenv("HIGHLIGHT_WEIGHT_YELLOW", "3.0")
+        config.get_settings.cache_clear()
+        try:
+            # Then settings expose the overridden weight
+            assert config.get_settings().highlight_color_weights["yellow"] == 3.0
+        finally:
+            config.get_settings.cache_clear()
 
 
 # ---------------------------------------------------------------------------

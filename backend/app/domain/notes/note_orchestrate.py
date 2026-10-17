@@ -26,6 +26,8 @@ class BuildSessionRequest:
     guideline: str | None = None
     note_count: int = 1
     user_preferred_guideline: str | None = None
+    use_highlights: bool = False                       # 형광 가중치 반영 토글 (끄면 기존 동작)
+    highlight_weights: dict[str, float] | None = None  # 색상→가중치(주입식, config 유래)
 
 
 def _collect_highlights(result: ExtractionResult) -> list[Highlight]:
@@ -53,7 +55,7 @@ def build_session(
     result = extractor.extract(req.pdf_path, req.page_range)
     context = prepare_context(result)
     pages = [pe.page for pe in result.pages]
-    highlights = _collect_highlights(result)
+    highlights = _collect_highlights(result) if req.use_highlights else []
     config = SessionConfig(
         source=result.source,
         pages=pages,
@@ -62,6 +64,7 @@ def build_session(
         guideline=req.guideline,
         user_preferred_guideline=req.user_preferred_guideline,
         highlights=highlights or None,
+        highlight_weights=req.highlight_weights,
     )
     session = NoteSession(client=client, context=context, config=config)
     session.start(note_count=req.note_count)

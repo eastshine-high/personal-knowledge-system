@@ -98,6 +98,8 @@ def create_session(
                 note_count=req.note_count,
                 created=date.today().isoformat(),
                 user_preferred_guideline=req.user_preferred_guideline,
+                use_highlights=req.use_highlights,
+                highlight_weights=get_settings().highlight_color_weights,
             ),
             extractor=extractor,
             client=client,

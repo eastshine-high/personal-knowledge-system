@@ -121,6 +121,7 @@ def _settings(backend):
         render_dpi=200, request_timeout_s=5, crop_dir="/tmp/crops", max_retries=2,
         retry_backoff_s=0, warmup=False, fixtures_dir="/tmp/fixtures",
         llm_backend="mock", llm_model="claude-sonnet-4-6",
+        highlight_color_weights={"green": 2.0, "yellow": 1.0, "other": 1.0},
     )
 
 

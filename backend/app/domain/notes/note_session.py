@@ -37,6 +37,7 @@ class SessionConfig:
     guideline: str | None = None
     user_preferred_guideline: str | None = None
     highlights: list[Highlight] | None = None
+    highlight_weights: dict[str, float] | None = None  # 색상→가중치(주입식, config 유래)
 
 
 def _make_initial_state(context: PreparedContext, config: SessionConfig) -> dict:
@@ -45,6 +46,7 @@ def _make_initial_state(context: PreparedContext, config: SessionConfig) -> dict
         "source_text": context.text,
         "figures": context.figures,
         "highlights": config.highlights or [],
+        "highlight_weights": config.highlight_weights,
         "source": config.source,
         "pages": config.pages,
         "topic": config.topic,
@@ -80,6 +82,7 @@ class NoteSession:
             guideline=guideline,
             note_count=note_count,
             highlights=self.state.get("highlights") or None,
+            highlight_weights=self.state.get("highlight_weights"),
         )
         drafts = summarize(self.client, req)
         self.state["notes"] = [

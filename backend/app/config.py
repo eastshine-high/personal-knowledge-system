@@ -42,6 +42,7 @@ class Settings:
     fixtures_dir: str           # EXTRACT_BACKEND=fixture 시 재생할 캡처 응답 디렉토리
     llm_backend: str            # 요약/리파인 LLM: "mock" | "anthropic" | "openai" | "local"
     llm_model: str              # Anthropic 모델 ID (llm_backend=anthropic 시 사용)
+    highlight_color_weights: dict[str, float]  # 형광 색상→가중치 (개인 편향 커스텀, 기본 초록>노랑)
 
 
 @functools.lru_cache(maxsize=1)
@@ -61,4 +62,9 @@ def get_settings() -> Settings:
         fixtures_dir=os.getenv("FIXTURES_DIR", str(_ENV_FILE.parent / "tests" / "fixtures")),
         llm_backend=os.getenv("LLM_BACKEND", "mock"),
         llm_model=os.getenv("LLM_MODEL", "claude-sonnet-4-6"),
+        highlight_color_weights={
+            "green": float(os.getenv("HIGHLIGHT_WEIGHT_GREEN", "2.0")),
+            "yellow": float(os.getenv("HIGHLIGHT_WEIGHT_YELLOW", "1.0")),
+            "other": float(os.getenv("HIGHLIGHT_WEIGHT_OTHER", "1.0")),
+        },
     )

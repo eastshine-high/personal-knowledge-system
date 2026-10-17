@@ -43,6 +43,7 @@ class CreateSessionRequest(BaseModel):
     guideline: str | None = None
     note_count: int = 1
     user_preferred_guideline: str | None = None
+    use_highlights: bool = False
 
 
 class RefineRequest(BaseModel):
