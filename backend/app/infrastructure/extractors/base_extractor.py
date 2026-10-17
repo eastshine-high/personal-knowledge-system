@@ -17,6 +17,7 @@ from ...domain.extractor import (
     PageExtraction,
     normalize_label,
 )
+from .highlight_color import detect_color_bands
 
 
 def _dedup_highlights(items: list[Highlight]) -> list[Highlight]:
@@ -56,9 +57,11 @@ class BaseLayoutExtractor:
                 if page_no > doc.page_count:
                     break
                 page = doc[page_no - 1]  # page_range는 1-based, pymupdf는 0-based
-                img_bytes = page.get_pixmap(dpi=self._dpi).tobytes("png")
-                raw = self._fetch_raw(page_no, img_bytes)
-                result.pages.append(self._assemble_page(page_no, raw, page))
+                pix = page.get_pixmap(dpi=self._dpi)  # 색 검출과 공유 (추가 렌더 0회)
+                raw = self._fetch_raw(page_no, pix.tobytes("png"))
+                pe = self._assemble_page(page_no, raw, page)
+                pe.highlights = self._extract_highlights(page, pe.blocks, pix)
+                result.pages.append(pe)
             return result
         finally:
             doc.close()
@@ -73,7 +76,7 @@ class BaseLayoutExtractor:
 
     # --- 공유 로직 -----------------------------------------------------
     def _assemble_page(self, page_no: int, raw: dict, page: "pymupdf.Page") -> PageExtraction:
-        """raw 응답을 PageExtraction으로 조립 — 블록 파싱 + 형광 추출."""
+        """raw 응답을 PageExtraction으로 조립 — 블록 파싱(형광 추출은 extract 루프에서 합류)."""
         meta = raw.get("meta") or {}
         pe = PageExtraction(
             page=page_no,
@@ -83,7 +86,6 @@ class BaseLayoutExtractor:
         )
         for rb in raw.get("blocks") or []:
             pe.blocks.append(self._make_block(rb, page, page_no))
-        pe.highlights = self._extract_highlights(page, pe.blocks)
         return pe
 
     def _make_block(self, rb: dict, page: "pymupdf.Page", page_no: int) -> Block:
@@ -100,14 +102,21 @@ class BaseLayoutExtractor:
             image_ref=image_ref,
         )
 
-    def _extract_highlights(self, page: "pymupdf.Page", blocks: "list[Block]") -> "list[Highlight]":
-        """PDF 형광 표시(highlight) 주석에서 텍스트를 수집한다.
+    def _extract_highlights(
+        self, page: "pymupdf.Page", blocks: "list[Block]", pix: "pymupdf.Pixmap"
+    ) -> "list[Highlight]":
+        """형광 표시를 수집한다 — 주석 우선, 없으면 평탄화 색 검출 폴백.
 
-        1차: 페이지 텍스트 레이어에서 추출 (대부분의 GoodNotes PDF)
-        폴백: annotation rect를 render 픽셀로 변환해 OCR 블록과 매핑 (스캔 전용 PDF)
-
-        평탄화(주석 없음) 형광펜의 색 검출은 _assemble_page에서 합류한다.
+        주석 경로: Highlight 주석 rect의 텍스트 레이어(없으면 OCR 블록 매핑). color="other".
+        색 폴백(주석 0건): pix에서 형광색 밴드를 찾아 OCR 블록과 교집합, 밴드 색상을 부착.
         """
+        annots = self._highlights_from_annots(page, blocks)
+        if annots:
+            return _dedup_highlights(annots)
+        return _dedup_highlights(self._highlights_from_color(pix, blocks))
+
+    def _highlights_from_annots(self, page: "pymupdf.Page", blocks: "list[Block]") -> "list[Highlight]":
+        """PDF Highlight 주석에서 텍스트를 수집 (텍스트 레이어 우선, OCR 블록 폴백)."""
         results: list[Highlight] = []
         for annot in page.annots() or []:
             if annot.type[0] != pymupdf.PDF_ANNOT_HIGHLIGHT:
@@ -120,7 +129,16 @@ class BaseLayoutExtractor:
                 text = self._blocks_in_rect(px_rect, blocks)
             if text:
                 results.append(Highlight(text=text, color="other"))
-        return _dedup_highlights(results)
+        return results
+
+    def _highlights_from_color(self, pix: "pymupdf.Pixmap", blocks: "list[Block]") -> "list[Highlight]":
+        """평탄화 형광색 밴드를 검출해 겹치는 OCR 블록 텍스트를 밴드 색상과 함께 수집."""
+        results: list[Highlight] = []
+        for rect, color in detect_color_bands(pix):
+            text = self._blocks_in_rect(rect, blocks)
+            if text:
+                results.append(Highlight(text=text, color=color))
+        return results
 
     def _blocks_in_rect(self, rect: "pymupdf.Rect", blocks: "list[Block]") -> str:
         """annotation bbox(render 픽셀)와 50% 이상 겹치는 텍스트 블록을 이어붙여 반환."""

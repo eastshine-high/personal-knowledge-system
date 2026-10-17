@@ -59,6 +59,29 @@ def no_text_highlighted_pdf(tmp_path):
     return str(p)
 
 
+@pytest.fixture
+def flattened_highlight_pdf(tmp_path):
+    """주석이 아닌 '평탄화된' 색 사각형(형광펜)이 그려진 PDF를 만드는 팩토리."""
+    def _make(fill):
+        doc = pymupdf.open()
+        page = doc.new_page(width=300, height=300)
+        page.insert_text((12, 55), "형광 처리된 텍스트", fontsize=11)
+        page.draw_rect(pymupdf.Rect(10, 42, 200, 60), fill=fill, fill_opacity=0.4)
+        p = tmp_path / "flat.pdf"
+        doc.save(str(p))
+        doc.close()
+        return str(p)
+    return _make
+
+
+# 형광 사각형(점 10,42~200,60)을 덮는 OCR 블록 — render_dpi 200 → ×(200/72) 픽셀 좌표.
+_FLAT_BLOCK = {
+    "order": 1, "id": 0, "label": "text",
+    "bbox": [round(10 * 200 / 72), round(42 * 200 / 72), round(200 * 200 / 72), round(60 * 200 / 72)],
+    "content": "형광 처리된 텍스트",
+}
+
+
 def _raw(blocks, w=833, h=833):
     return {
         "predict_seconds": 0.0,
@@ -435,3 +458,30 @@ class DescribeHighlightExtraction:
         # Then the OCR text from the overlapping block is used as the highlight
         assert [h.text for h in res.pages[0].highlights] == ["OCR 폴백 텍스트"]
         assert res.pages[0].highlights[0].color == "other"  # 주석 경로는 색 미분류
+
+
+class DescribeFlattenedColorHighlights:
+    """주석 없는 평탄화 형광펜 → 색 검출 + OCR 블록 교집합 동작 명세."""
+
+    def test_detects_flattened_yellow_highlight(self, flattened_highlight_pdf, tmp_path):
+        # Given a PDF whose yellow highlight is flattened pixels (주석 0개) + 덮는 OCR 블록
+        pdf = flattened_highlight_pdf((1, 1, 0))
+        ext = _make_ext(_raw([_FLAT_BLOCK]), tmp_path)
+
+        # When extracted
+        res = ext.extract(pdf, (1, 1))
+
+        # Then the under-text is captured and tagged yellow
+        assert [h.text for h in res.pages[0].highlights] == ["형광 처리된 텍스트"]
+        assert res.pages[0].highlights[0].color == "yellow"
+
+    def test_detects_flattened_green_highlight(self, flattened_highlight_pdf, tmp_path):
+        # Given a flattened green highlight
+        pdf = flattened_highlight_pdf((0, 1, 0))
+        ext = _make_ext(_raw([_FLAT_BLOCK]), tmp_path)
+
+        # When extracted
+        res = ext.extract(pdf, (1, 1))
+
+        # Then it is tagged green
+        assert res.pages[0].highlights[0].color == "green"
