@@ -11,19 +11,34 @@ _SYSTEM = (
 )
 
 
-def _build_system_content(context_text: str, highlights: list[str] | None) -> str:
+def _focus_block(highlights: list) -> str:
+    """형광 구절을 가중치 2그룹(가장 중요/중요)으로. 단일 가중/구버전(str)은 평면 나열."""
+    items = [
+        (h["text"], float(h.get("weight", 1.0))) if isinstance(h, dict) else (str(h), 1.0)
+        for h in highlights
+    ]
+    if len({w for _, w in items}) < 2:
+        return "\n".join(f"- {t}" for t, _ in items)
+    top = max(w for _, w in items)
+    lines = ["[가장 중요 — 특히 강조한 구절]"]
+    lines += [f"- {t}" for t, w in items if w == top]
+    lines += ["[중요 — 표시한 구절]"]
+    lines += [f"- {t}" for t, w in items if w != top]
+    return "\n".join(lines)
+
+
+def _build_system_content(context_text: str, highlights: list | None) -> str:
     """시스템 메시지 content 조립 — 컨텍스트 + (선택) [READER_FOCUS] 블록."""
     content = f"{_SYSTEM}\n\n[CONTEXT]\n{context_text}"
     if highlights:
-        focus = "\n".join(f"- {h}" for h in highlights)
-        content += f"\n\n[READER_FOCUS]\n독자가 중요하게 표시한 내용:\n{focus}"
+        content += f"\n\n[READER_FOCUS]\n독자가 중요하게 표시한 내용:\n{_focus_block(highlights)}"
     return content
 
 
 def build_chat_messages(
     context_text: str,
     history: list[dict],
-    highlights: list[str] | None = None,
+    highlights: list | None = None,
 ) -> list[Message]:
     """LLMClient.complete()에 넘길 메시지 목록 생성.
 

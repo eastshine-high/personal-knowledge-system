@@ -116,7 +116,7 @@ def create_conversation(
     sys_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
-        (sys_id, conv_id, "system", build_sys_content(context.text, highlights), n),
+        (sys_id, conv_id, "system", build_sys_content(context.text, highlights, settings.highlight_color_weights), n),
     )
     db.commit()
     return ConversationResponse(

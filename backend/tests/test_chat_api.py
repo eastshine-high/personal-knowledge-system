@@ -5,7 +5,7 @@ import app.db as db_mod
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.extractor import ExtractionResult, PageExtraction, Block, BBox
+from app.domain.extractor import ExtractionResult, PageExtraction, Block, BBox, Highlight
 from app.infrastructure import get_llm_client
 from app.config import get_settings
 
@@ -116,3 +116,56 @@ class DescribeSendMessage:
 
         # Then 422 is returned
         assert r.status_code == 422
+
+
+class _HighlightExtractor:
+    """노랑+초록 형광이 달린 PageExtraction 반환 (가중치 검증용)."""
+    def extract(self, pdf_path, page_range):
+        pe = PageExtraction(
+            page=page_range[0], width_px=100, height_px=100, render_dpi=200,
+            blocks=[Block(type="text", bbox=BBox(0, 0, 10, 10), text="content")],
+            highlights=[Highlight("노랑구절", "yellow"), Highlight("초록구절", "green")],
+        )
+        return ExtractionResult(source=pdf_path, pages=[pe])
+
+
+class DescribeChatHighlightWeighting:
+    """use_highlights=true 시 색/가중치가 [HIGHLIGHTS_JSON]에 반영되는지 명세."""
+
+    @pytest.fixture
+    def hl_client(self):
+        from app.main import app
+        from app.presentation.chat_router import _extractor_dep, _llm_dep
+        app.dependency_overrides[_extractor_dep] = lambda: _HighlightExtractor()
+        app.dependency_overrides[_llm_dep] = lambda: get_llm_client(
+            get_settings().__class__(**{**get_settings().__dict__, "llm_backend": "mock"})
+        )
+        with TestClient(app) as c:
+            yield c
+        app.dependency_overrides.clear()
+
+    def test_stores_color_and_weight_with_green_above_yellow(self, hl_client, tmp_path):
+        import json
+        import sqlite3
+        # Given a book + PDF
+        book = hl_client.post("/books", json={"title": "b"}).json()
+        pdf = tmp_path / "t.pdf"
+        pdf.write_bytes(b"%PDF-1.4")
+        pf = hl_client.post(f"/books/{book['id']}/pdfs",
+                            json={"label": "c", "pdf_path": str(pdf)}).json()
+
+        # When a conversation opts into highlights
+        conv = hl_client.post(f"/books/{book['id']}/conversations",
+                              json={"pdf_file_id": pf["id"], "pages_str": "1", "use_highlights": True}).json()
+
+        # Then the stored system message carries {text,color,weight} with green outweighing yellow
+        conn = sqlite3.connect(db_mod._DB_PATH)
+        conn.row_factory = sqlite3.Row
+        content = conn.execute(
+            "SELECT content FROM messages WHERE conversation_id=? AND role='system'", (conv["id"],)
+        ).fetchone()["content"]
+        conn.close()
+        data = json.loads(content.split("[HIGHLIGHTS_JSON]", 1)[1])
+        by_color = {d["color"]: d["weight"] for d in data}
+        assert {d["text"] for d in data} == {"노랑구절", "초록구절"}
+        assert by_color["green"] > by_color["yellow"]  # 초록이 더 높은 가중치

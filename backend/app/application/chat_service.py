@@ -39,12 +39,16 @@ def build_usage_response(usage: LLMUsage | None) -> LLMUsageResponse | None:
     )
 
 
-def build_sys_content(context_text: str, highlights: list[Highlight]) -> str:
+def build_sys_content(
+    context_text: str, highlights: list[Highlight], weights: dict[str, float] | None = None
+) -> str:
     """context_text + (선택) highlights를 시스템 메시지 content로 조립.
 
-    현재 [HIGHLIGHTS_JSON]은 텍스트 목록으로 직렬화(색/가중치 반영은 후속 작업).
+    [HIGHLIGHTS_JSON]에 {text,color,weight}로 직렬화 — 가중치를 생성 시점에 구워넣어
+    이후 프롬프트 빌드가 settings 없이 그룹핑하게 한다.
     """
     if highlights:
-        texts = [h.text for h in highlights]
-        return context_text + _HMARKER + _json.dumps(texts, ensure_ascii=False)
+        w = weights or {}
+        payload = [{"text": h.text, "color": h.color, "weight": w.get(h.color, 1.0)} for h in highlights]
+        return context_text + _HMARKER + _json.dumps(payload, ensure_ascii=False)
     return context_text
