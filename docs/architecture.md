@@ -32,7 +32,7 @@ backend/app/
 │   └── library_repository.py
 │
 ├── domain/             # 순수 모델 · 인터페이스. 외부 라이브러리 의존 금지
-│   ├── extractor.py            # LayoutExtractor 인터페이스 + Block/BBox 모델
+│   ├── extractor.py            # LayoutExtractor 인터페이스 + Block/BBox/Highlight 모델
 │   └── notes/
 │       ├── note_models.py      # Note, NoteDraft 모델
 │       ├── note_session.py     # NoteSession (상태 + 이벤트)
@@ -49,7 +49,8 @@ backend/app/
 │   ├── ocr_cache.py            # SQLite 기반 OCR 결과 캐시
 │   ├── note_session_store.py   # 인메모리 세션 레지스트리
 │   └── extractors/
-│       ├── base_extractor.py   # 렌더 루프 + 정규화 공유 로직
+│       ├── base_extractor.py   # 렌더 루프 + 정규화 + 형광(주석/색 검출) 공유 로직
+│       ├── highlight_color.py  # 평탄화 형광펜 색 검출 (numpy 마스킹)
 │       ├── modal_extractor.py  # 서버리스 GPU (PaddleOCR-VL)
 │       └── fixture_extractor.py # 오프라인 재생 (개발·테스트용)
 │
@@ -132,3 +133,7 @@ PDF 업로드
 | LLM에 텍스트만 전송 | PII 보호 — 이미지·bbox·원문 파일은 외부 미전송 |
 | OCR 결과 SQLite 캐시 | 동일 PDF 재처리 방지. 페이지 단위 부분 캐시 지원 |
 | fixture_extractor | 오프라인 개발·테스트용. Modal 비용 없이 재현 가능한 실행 |
+| 형광펜 색 검출(평탄화) | GoodNotes 백업은 형광펜을 PDF 주석이 아닌 픽셀로 평탄화(실측: 대상 파일 725p 주석 0개)해, 주석 경로만으로는 못 잡음. 주석 우선 → 없으면 렌더 pixmap에서 색 밴드를 검출해 OCR 블록과 교집합. 추출 시 생성한 pixmap 재사용(추가 렌더 0회) |
+| Highlight{text,color} 모델 | 형광 표시를 문자열이 아닌 색상 포함 모델로. 색→가중치 환산은 소비 시점(설정 변경이 과거 데이터에 비소급) |
+| 색 가중치 config 주입 | 색→가중치(기본 초록>노랑)는 `config.highlight_color_weights`(env 커스텀). domain은 config 비의존 — presentation에서 가중치를 주입 |
+| 형광 반영 opt-in 토글 | 요약/대화 모두 `use_highlights`로 게이팅. 끄면 형광 미수집(기존 동작 보존) |
