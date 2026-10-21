@@ -1,4 +1,4 @@
-import type { Book, ChatResponse, Conversation, Message, NoteResponse, PdfFile, SessionResponse } from "./types";
+import type { Book, ChatResponse, Conversation, Extraction, Message, NoteResponse, PdfFile, SessionResponse } from "./types";
 
 const BASE = "http://localhost:8000";
 
@@ -119,8 +119,37 @@ export function createConversation(
   });
 }
 
+export function updateConversationTopic(convId: string, topic: string): Promise<Conversation> {
+  return request(`/conversations/${convId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ topic }),
+  });
+}
+
 export function getMessages(convId: string): Promise<Message[]> {
   return request(`/conversations/${convId}/messages`);
+}
+
+// --- 추출 세트 (주제별 OCR 범위) ---------------------------------------------
+
+export function getExtractions(bookId: string, pdfId: string): Promise<Extraction[]> {
+  return request(`/books/${bookId}/pdfs/${pdfId}/extractions`);
+}
+
+export function createExtraction(
+  bookId: string,
+  pdfId: string,
+  topic: string,
+  pages_str: string,
+): Promise<Extraction> {
+  return request(`/books/${bookId}/pdfs/${pdfId}/extractions`, {
+    method: "POST",
+    body: JSON.stringify({ topic, pages_str }),
+  });
+}
+
+export function deleteExtraction(bookId: string, pdfId: string, id: string): Promise<void> {
+  return request(`/books/${bookId}/pdfs/${pdfId}/extractions/${id}`, { method: "DELETE" });
 }
 
 export function sendMessage(convId: string, content: string): Promise<ChatResponse> {

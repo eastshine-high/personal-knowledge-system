@@ -38,8 +38,18 @@ export interface Conversation {
   pages: number[];
   pages_display: string;
   title: string | null;
+  topic: string | null;
   created_at: string;
   extraction_stats?: ExtractionStats | null;
+}
+
+export interface Extraction {
+  id: string;
+  pdf_file_id: string;
+  topic: string;
+  pages: number[];
+  pages_display: string;
+  created_at: string;
 }
 
 export interface Message {

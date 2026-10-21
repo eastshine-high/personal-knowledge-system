@@ -7,6 +7,7 @@ import RefineChat from "./components/RefineChat";
 import Toolbar from "./components/Toolbar";
 import LibraryPanel from "./components/LibraryPanel";
 import ConversationList from "./components/ConversationList";
+import ExtractionList from "./components/ExtractionList";
 import NewChatForm from "./components/NewChatForm";
 import ChatPanel from "./components/ChatPanel";
 
@@ -135,14 +136,18 @@ export default function App() {
           )}
 
           {mainView.kind === "conversation-list" && selectedPdf && (
-            <ConversationList
-              book={selectedPdf.book}
-              pdf={selectedPdf.pdf}
-              selectedConvId={mainView.kind === "conversation-list" ? null : null}
-              onSelectConv={handleSelectConv}
-              onNewChat={() => setMainView({ kind: "new-chat" })}
-              newConv={newConv}
-            />
+            <div style={s.twoAxis}>
+              <ExtractionList book={selectedPdf.book} pdf={selectedPdf.pdf} />
+              <div style={s.axisDivider} />
+              <ConversationList
+                book={selectedPdf.book}
+                pdf={selectedPdf.pdf}
+                selectedConvId={null}
+                onSelectConv={handleSelectConv}
+                onNewChat={() => setMainView({ kind: "new-chat" })}
+                newConv={newConv}
+              />
+            </div>
           )}
 
           {mainView.kind === "new-chat" && selectedPdf && (
@@ -233,6 +238,8 @@ const s: Record<string, React.CSSProperties> = {
     border: "none", borderRadius: 4, fontSize: 13, cursor: "pointer",
   },
   content: { flex: 1, overflowY: "auto", padding: 20 },
+  twoAxis: { display: "flex", flexDirection: "column", gap: 16 },
+  axisDivider: { borderTop: "1px solid #eee" },
   emptyState: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 4 },
   emptyText: { margin: 0, fontSize: 14, color: "#aaa" },
   // 모달
