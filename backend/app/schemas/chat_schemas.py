@@ -25,6 +25,7 @@ class ConversationResponse(BaseModel):
     pages: list[int]
     pages_display: str      # "p.10-15, 21"
     title: str | None
+    topic: str | None = None
     created_at: str
     extraction_stats: ExtractionStatsResponse | None = None
 
@@ -33,6 +34,10 @@ class ConversationCreate(BaseModel):
     pdf_file_id: str
     pages_str: str          # "10-15, 21" 형식
     use_highlights: bool = False
+
+
+class ConversationUpdate(BaseModel):
+    topic: str
 
 
 class MessageResponse(BaseModel):

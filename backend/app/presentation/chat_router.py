@@ -38,6 +38,7 @@ from ..schemas import (
     ChatResponse,
     ConversationCreate,
     ConversationResponse,
+    ConversationUpdate,
     ExtractionStatsResponse,
     LLMUsageResponse,
     MessageCreate,
@@ -126,6 +127,17 @@ def create_conversation(
     )
 
 
+@router.patch("/conversations/{conv_id}", response_model=ConversationResponse)
+def update_conversation(conv_id: str, req: ConversationUpdate, db=Depends(get_db)):
+    """대화 주제(topic)를 수정한다."""
+    if not db.execute("SELECT 1 FROM conversations WHERE id = ?", (conv_id,)).fetchone():
+        raise HTTPException(status_code=404, detail="대화 없음")
+    db.execute("UPDATE conversations SET topic = ? WHERE id = ?", (req.topic, conv_id))
+    db.commit()
+    row = db.execute("SELECT * FROM conversations WHERE id = ?", (conv_id,)).fetchone()
+    return row_to_conv(row)
+
+
 @router.get("/conversations/{conv_id}/messages", response_model=list[MessageResponse])
 def get_messages(conv_id: str, db=Depends(get_db)):
     if not db.execute("SELECT 1 FROM conversations WHERE id = ?", (conv_id,)).fetchone():
@@ -163,13 +175,16 @@ def send_message(
         assistant_text=assistant_text,
         now=n,
         had_title=bool(conv_row["title"]),
+        had_topic=bool(conv_row["topic"]),
     ))
 
     pages = _json.loads(conv_row["pages_json"])
+    auto = req.content[:20].strip()
     conv_resp = ConversationResponse(
         id=conv_id, book_id=conv_row["book_id"], pdf_file_id=conv_row["pdf_file_id"],
         pages=pages, pages_display=format_pages(pages),
-        title=req.content[:20].strip() if not conv_row["title"] else conv_row["title"],
+        title=conv_row["title"] or auto,
+        topic=conv_row["topic"] or auto,
         created_at=conv_row["created_at"],
     )
     msg_resp = MessageResponse(

@@ -17,13 +17,14 @@ def now() -> str:
 
 @dataclass
 class ChatExchange:
-    """persist_exchange 호출 파라미터 — 대화 ID·user/assistant 메시지·타임스탬프·제목 여부."""
+    """persist_exchange 호출 파라미터 — 대화 ID·user/assistant 메시지·타임스탬프·제목/주제 유무."""
 
     conv_id: str
     user_content: str
     assistant_text: str
     now: str
     had_title: bool
+    had_topic: bool = False
 
 
 def row_to_conv(row) -> ConversationResponse:
@@ -36,6 +37,7 @@ def row_to_conv(row) -> ConversationResponse:
         pages=pages,
         pages_display=format_pages(pages),
         title=row["title"],
+        topic=row["topic"],
         created_at=row["created_at"],
     )
 
@@ -102,7 +104,10 @@ def persist_exchange(db, exchange: ChatExchange) -> str:
         "INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?,?,?,?,?)",
         (asst_id, exchange.conv_id, "assistant", exchange.assistant_text, exchange.now),
     )
+    first_line = exchange.user_content[:20].strip()
     if not exchange.had_title:
-        db.execute("UPDATE conversations SET title = ? WHERE id = ?", (exchange.user_content[:20].strip(), exchange.conv_id))
+        db.execute("UPDATE conversations SET title = ? WHERE id = ?", (first_line, exchange.conv_id))
+    if not exchange.had_topic:
+        db.execute("UPDATE conversations SET topic = ? WHERE id = ?", (first_line, exchange.conv_id))
     db.commit()
     return asst_id

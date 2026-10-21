@@ -102,6 +102,36 @@ class DescribeSendMessage:
         assert msgs[0]["role"] == "user"
         assert msgs[1]["role"] == "assistant"
 
+
+class DescribeConversationTopic:
+    """대화 주제(topic) 자동 생성 + 수정 명세."""
+
+    def test_topic_is_auto_set_from_first_message(self, conversation):
+        # Given a fresh conversation (topic 없음)
+        client, _, _, conv = conversation
+        assert conv.get("topic") in (None, "")
+
+        # When the first message is sent
+        resp = client.post(f"/conversations/{conv['id']}/messages",
+                           json={"content": "트랜스포머 구조"}).json()
+
+        # Then the topic is auto-derived from that message
+        assert resp["conversation"]["topic"] == "트랜스포머 구조"
+
+    def test_topic_can_be_edited_via_patch(self, conversation):
+        # Given a conversation
+        client, _, _, conv = conversation
+
+        # When its topic is patched
+        r = client.patch(f"/conversations/{conv['id']}", json={"topic": "어텐션 메커니즘"})
+
+        # Then the new topic is reflected
+        assert r.status_code == 200
+        assert r.json()["topic"] == "어텐션 메커니즘"
+
+    def test_patch_missing_conversation_returns_404(self, client):
+        assert client.patch("/conversations/nope", json={"topic": "x"}).status_code == 404
+
     def test_invalid_pages_str_returns_422(self, client, tmp_path):
         # Given a reversed range
         book = client.post("/books", json={"title": "테스트북"}).json()
