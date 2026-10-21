@@ -141,6 +141,8 @@ DDD 레이어드 아키텍처 적용. 상세 구조·파일 목록·설계 결�
 | Figure crop | figure 블록 영역을 원본 페이지 이미지에서 잘라낸 이미지 (외부 미전송) |
 | Summary note | 추출 텍스트를 LLM이 요약한 마크다운 노트(프론트매터 포함) |
 | LayoutExtractor | PDF+페이지범위 → 정규화 블록/크롭을 내는 교체가능 인터페이스 |
+| Highlight | 독자의 형광 표시 1건 — 텍스트 + 색상(yellow/green/other). 주석 또는 평탄화 색 검출로 추출, 색→가중치(초록>노랑, config 커스텀)로 요약/대화에 반영 (`use_highlights` opt-in) |
+| 추출 세트(Extraction set) | PDF 아래의 `(주제, 페이지 범위)` 단위. 생성 시 범위를 OCR(페이지 캐시). 대화와 **독립 2축**(외래키 없음)이며 `page_extractions` 페이지 캐시만 공유 — 주제별 선-OCR·조직화용 |
 
 **후속 모듈(Qdrant) 용어**
 

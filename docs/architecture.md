@@ -24,12 +24,14 @@ backend/app/
 ├── presentation/       # HTTP 핸들러 · DI · 스키마 변환. FastAPI 허용
 │   ├── notes_router.py
 │   ├── chat_router.py
-│   └── library_router.py
+│   ├── library_router.py
+│   └── extraction_router.py     # 추출 세트(주제별 OCR 범위) CRUD
 │
 ├── application/        # 유스케이스 · DB 쿼리. FastAPI import 금지
 │   ├── chat_service.py
 │   ├── chat_repository.py
-│   └── library_repository.py
+│   ├── library_repository.py
+│   └── extraction_repository.py # 추출 세트 DB 쿼리
 │
 ├── domain/             # 순수 모델 · 인터페이스. 외부 라이브러리 의존 금지
 │   ├── extractor.py            # LayoutExtractor 인터페이스 + Block/BBox/Highlight 모델
@@ -57,7 +59,8 @@ backend/app/
 ├── schemas/            # 공용 Pydantic DTO (__init__.py에서 전체 re-export)
 │   ├── notes_schemas.py
 │   ├── chat_schemas.py
-│   └── library_schemas.py
+│   ├── library_schemas.py
+│   └── extraction_schemas.py
 │
 ├── config.py           # Settings — 환경변수 + .env.modal 로드
 ├── db.py               # SQLite 연결 + 스키마 초기화
@@ -137,3 +140,5 @@ PDF 업로드
 | Highlight{text,color} 모델 | 형광 표시를 문자열이 아닌 색상 포함 모델로. 색→가중치 환산은 소비 시점(설정 변경이 과거 데이터에 비소급) |
 | 색 가중치 config 주입 | 색→가중치(기본 초록>노랑)는 `config.highlight_color_weights`(env 커스텀). domain은 config 비의존 — presentation에서 가중치를 주입 |
 | 형광 반영 opt-in 토글 | 요약/대화 모두 `use_highlights`로 게이팅. 끄면 형광 미수집(기존 동작 보존) |
+| OCR 범위 ↔ 대화 범위 분리(독립 2축) | PDF 아래 `extractions`(주제별 OCR 범위)와 `conversations`(주제별 질의)가 **외래키 없이 독립**. 둘은 `page_extractions`(페이지 단위) 캐시만 공유 — 대화가 미캐시 페이지를 포함하면 그때만 on-demand OCR. 세트 삭제는 공유 캐시 미삭제 |
+| 대화 topic 자동+수정 | `conversations.topic`은 첫 메시지에서 자동 생성(title과 동일 자리), 이후 `PATCH /conversations/{id}`로 수정. 입력 부담 0 + 사후 조직화 |
