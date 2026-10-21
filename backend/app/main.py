@@ -7,6 +7,7 @@ from .db import init_db
 from .presentation.notes_router import router
 from .presentation.chat_router import router as chat_router
 from .presentation.library_router import router as library_router
+from .presentation.extraction_router import router as extraction_router
 
 
 @asynccontextmanager
@@ -27,6 +28,7 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(library_router)
 app.include_router(chat_router)
+app.include_router(extraction_router)
 
 
 @app.get("/health")

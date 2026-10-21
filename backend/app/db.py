@@ -54,6 +54,14 @@ _SCHEMA = """
         created_at  TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS extractions (
+        id          TEXT PRIMARY KEY,
+        pdf_file_id TEXT NOT NULL REFERENCES pdf_files(id),
+        topic       TEXT NOT NULL,
+        pages_json  TEXT NOT NULL,
+        created_at  TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS messages (
         id              TEXT PRIMARY KEY,
         conversation_id TEXT NOT NULL REFERENCES conversations(id),
@@ -64,8 +72,16 @@ _SCHEMA = """
 """
 
 
+def _migrate_add_columns(conn: sqlite3.Connection) -> None:
+    """기존 테이블에 신규 컬럼을 멱등하게 추가 (CREATE IF NOT EXISTS로는 컬럼 미반영)."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(conversations)")}
+    if "topic" not in cols:
+        conn.execute("ALTER TABLE conversations ADD COLUMN topic TEXT")
+
+
 def init_db() -> None:
     """모든 테이블을 멱등하게 생성. 앱 시작 시 호출."""
     conn = get_db()
     conn.executescript(_SCHEMA)
+    _migrate_add_columns(conn)
     conn.commit()

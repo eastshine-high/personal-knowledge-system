@@ -20,6 +20,7 @@ from .notes_schemas import (
     RefineRequest,
     SessionResponse,
 )
+from .extraction_schemas import ExtractionCreate, ExtractionResponse
 
 __all__ = [
     "BookCreate",
@@ -33,6 +34,8 @@ __all__ = [
     "LLMUsageResponse",
     "MessageCreate",
     "MessageResponse",
+    "ExtractionCreate",
+    "ExtractionResponse",
     "CreateSessionRequest",
     "EditRequest",
     "EventResponse",
